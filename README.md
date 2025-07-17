@@ -1,4 +1,4 @@
-# Voice Commander 🎙️
+# Voice Commander 🎙️:military_helmet: :saluting_face:
 
 Local voice transcription for coding using whisper.cpp. Works offline, privacy-focused.
 
