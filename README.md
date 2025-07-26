@@ -3,7 +3,7 @@ Local voice transcription for coding using whisper.cpp. Works offline, privacy-f
 
 ## Example Usage
 
-
+Uploading test_lq.mp4…
 
 ## Features
 - F8/F9 hotkeys for recording
