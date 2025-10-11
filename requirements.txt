@@ -1,0 +1,7 @@
+sounddevice>=0.4.6
+scipy>=1.10.0
+numpy>=1.24.0
+pyperclip>=1.8.2
+pynput>=1.7.6
+python-dotenv>=1.0.0
+google-genai>=0.3.0
