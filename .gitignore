@@ -1,11 +1,46 @@
-whisper.cpp/models/*.bin
-whisper.cpp/models/*.ggml
-whisper.cpp/whisper-cli
+# Secrets
+.env
+.env.local
+
+# Whisper.cpp - exclude entire directory (users should clone separately)
+whisper.cpp/
+
+# Model files
 *.bin
 *.ggml
+
+# Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+ENV/
+
+# Build artifacts
 *.exe
 *.so
-*.dylib 
-*.vsix 
+*.dylib
+*.a
+*.o
+build/
+dist/
+
+# VS Code extension
+*.vsix
+
+# Temporary files
+*.wav
+*.tmp
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db 

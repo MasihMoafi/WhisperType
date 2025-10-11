@@ -9,20 +9,38 @@ import numpy as np
 import pyperclip
 from pynput import keyboard
 import sys
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # --- CONFIGURATION ---
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.dirname(SCRIPT_DIR)
 
 WHISPER_CPP_DIR = os.path.join(BASE_DIR, "whisper.cpp")
-WHISPER_EXECUTABLE = os.path.join(WHISPER_CPP_DIR, "whisper-cli")
+WHISPER_EXECUTABLE = os.path.join(WHISPER_CPP_DIR, "build", "bin", "whisper-cli")
 WHISPER_MODEL_PATH = os.path.join(WHISPER_CPP_DIR, "models", "ggml-medium.en.bin")
+
+# Add whisper library paths to LD_LIBRARY_PATH
+WHISPER_LIB_DIR = os.path.join(WHISPER_CPP_DIR, "build", "src")
+GGML_LIB_DIR = os.path.join(WHISPER_CPP_DIR, "build", "ggml", "src")
+GGML_CUDA_DIR = os.path.join(WHISPER_CPP_DIR, "build", "ggml", "src", "ggml-cuda")
+lib_paths = [WHISPER_LIB_DIR, GGML_LIB_DIR, GGML_CUDA_DIR]
+current_ld_path = os.environ.get('LD_LIBRARY_PATH', '')
+new_paths = [p for p in lib_paths if os.path.exists(p) and p not in current_ld_path]
+if new_paths:
+    os.environ['LD_LIBRARY_PATH'] = ":".join(new_paths + [current_ld_path])
 HOTKEYS = [keyboard.Key.f8, keyboard.Key.f9]
 SAMPLERATE = 16000
 
 # GPU Configuration
 GPU_LAYERS = 33  # Medium model has 33 layers
 USE_GPU = True
+
+# LLM Post-Processing Configuration
+ENABLE_LLM_PROCESSING = os.environ.get("VC_ENABLE_LLM", "true").lower() == "true"
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+LLM_OUTPUT_FORMAT = os.environ.get("VC_LLM_FORMAT", "xml")  # plain, xml, json
 
 
 def _get_active_window_classes_x11():
@@ -68,6 +86,96 @@ def send_paste(controller: keyboard.Controller):
         with controller.pressed(keyboard.Key.ctrl):
             controller.press('v')
             controller.release('v')
+
+def refine_with_llm(text):
+    """Post-process transcribed text with Gemini API"""
+    if not ENABLE_LLM_PROCESSING or not GEMINI_API_KEY:
+        return text
+    
+    try:
+        from google import genai
+        from google.genai import types
+        
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        
+        # Build format-specific prompt
+        if LLM_OUTPUT_FORMAT == "xml":
+            format_instruction = """
+Format the output as XML:
+<prompt>
+  <task>main task description</task>
+  <context>any relevant context</context>
+  <requirements>specific requirements if any</requirements>
+</prompt>"""
+        elif LLM_OUTPUT_FORMAT == "json":
+            format_instruction = """
+Format the output as JSON:
+{
+  "task": "main task description",
+  "context": "any relevant context",
+  "requirements": ["requirement1", "requirement2"]
+}"""
+        else:
+            format_instruction = ""
+        
+        prompt = f"""You are an expert prompt engineer. Clean and structure this transcribed speech into a professional LLM prompt.
+
+Rules:
+1. Remove filler words: um, uh, like, you know, so, well, actually
+2. Delete [bracketed artifacts] completely: [MUSIC PLAYING], [NOISE], etc.
+3. Fix grammar, spelling, and sentence structure
+4. Preserve ALL technical terms, code snippets, numbers, and domain-specific language EXACTLY
+5. Maintain the user's original intent and meaning
+
+Examples:
+Input: "um so like I want to [NOISE] create a function that uh calculates fibonacci"
+Output: <prompt><task>Create a function that calculates the Fibonacci sequence</task></prompt>
+
+Input: "can you help me debug this numpy array issue where the shapes don't match"
+Output: <prompt><task>Debug a NumPy array issue where shapes don't match</task></prompt>
+
+{format_instruction}
+
+Input: {text}
+
+Output:"""
+        
+        contents = [
+            types.Content(
+                role="user",
+                parts=[types.Part.from_text(text=prompt)],
+            ),
+        ]
+        
+        config = types.GenerateContentConfig(
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
+            temperature=0.2,
+        )
+        
+        print("Refining with Gemini Flash Lite...")
+        response = client.models.generate_content(
+            model="gemini-flash-lite-latest",
+            contents=contents,
+            config=config,
+        )
+        
+        refined = response.text.strip()
+        
+        if refined:
+            print(f"Refined: {refined}")
+            return refined
+        else:
+            print("LLM returned empty response, using original")
+            return text
+            
+    except ImportError:
+        print("google-genai library not found. Install with: pip install google-genai")
+        print("Using original transcription without LLM refinement")
+        return text
+    except Exception as e:
+        print(f"LLM processing failed: {e}")
+        print("Using original transcription")
+        return text
 
 class Recorder:
     def __init__(self):
@@ -181,7 +289,9 @@ class Recorder:
                 controller.press(keyboard.Key.esc)
                 controller.release(keyboard.Key.esc)
             else:
-                pyperclip.copy(original_transcribed_text)
+                # Apply LLM refinement for regular text
+                refined_text = refine_with_llm(original_transcribed_text)
+                pyperclip.copy(refined_text)
                 print("Text copied to clipboard. Pasting...")
                 send_paste(controller)
                 print("Paste command sent.")
@@ -201,6 +311,10 @@ def on_press(key):
 def main():
     print(f"VoiceCommander (GPU) is active. Press F8 or F9 to start/stop recording.")
     print("GPU acceleration enabled with CUDA.")
+    if ENABLE_LLM_PROCESSING and GEMINI_API_KEY:
+        print("LLM post-processing enabled with Gemini Flash Lite")
+    else:
+        print("LLM post-processing disabled (set VC_ENABLE_LLM=true and GEMINI_API_KEY)")
     print("The transcribed text will be pasted at your cursor's location.")
     print("Close this window or press Ctrl+C to exit.")
     
