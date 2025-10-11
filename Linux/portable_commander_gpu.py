@@ -36,11 +36,23 @@ SAMPLERATE = 16000
 # GPU Configuration
 GPU_LAYERS = 33  # Medium model has 33 layers
 USE_GPU = True
+ENFORCE_GPU_ONLY = True  # Fail if GPU not available, never fall back to CPU
 
 # LLM Post-Processing Configuration
 ENABLE_LLM_PROCESSING = os.environ.get("VC_ENABLE_LLM", "true").lower() == "true"
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 LLM_OUTPUT_FORMAT = os.environ.get("VC_LLM_FORMAT", "xml")  # plain, xml, json
+
+
+def verify_gpu_available():
+    """Verify CUDA GPU is available before starting"""
+    try:
+        result = subprocess.run(['nvidia-smi'], capture_output=True, text=True)
+        if result.returncode != 0:
+            return False
+        return True
+    except FileNotFoundError:
+        return False
 
 
 def _get_active_window_classes_x11():
@@ -222,9 +234,24 @@ class Recorder:
         tmp_audio_path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4()}.wav")
         write_wav(tmp_audio_path, SAMPLERATE, recording)
 
+        # Build command with GPU enforcement
         command = [WHISPER_EXECUTABLE, "-m", WHISPER_MODEL_PATH, "-f", tmp_audio_path, "-nt"]
         
-        result = subprocess.run(command, capture_output=True, text=True)
+        # Force GPU usage by setting CUDA environment
+        env = os.environ.copy()
+        env['CUDA_VISIBLE_DEVICES'] = '0'  # Use first GPU
+        env['GGML_CUDA_NO_PINNED'] = '0'   # Enable pinned memory for GPU
+        
+        result = subprocess.run(command, capture_output=True, text=True, env=env)
+        
+        # Check if GPU was actually used by looking for CPU fallback indicators
+        if ENFORCE_GPU_ONLY and result.stderr:
+            stderr_lower = result.stderr.lower()
+            if 'cpu' in stderr_lower or 'fallback' in stderr_lower or 'no cuda' in stderr_lower:
+                os.remove(tmp_audio_path)
+                print("ERROR: GPU not available or Whisper fell back to CPU!")
+                print("Voice Commander requires GPU. Please check CUDA installation.")
+                return
 
         os.remove(tmp_audio_path)
 
@@ -309,8 +336,23 @@ def on_press(key):
             recorder.start()
 
 def main():
+    # Verify GPU availability at startup
+    if ENFORCE_GPU_ONLY and not verify_gpu_available():
+        print("=" * 60)
+        print("ERROR: GPU NOT AVAILABLE")
+        print("=" * 60)
+        print("Voice Commander requires CUDA-capable GPU.")
+        print("Please ensure:")
+        print("  1. NVIDIA GPU is installed")
+        print("  2. CUDA drivers are installed (nvidia-smi works)")
+        print("  3. Whisper.cpp was compiled with CUDA support")
+        print("\nSet ENFORCE_GPU_ONLY=False in code to allow CPU fallback.")
+        print("=" * 60)
+        sys.exit(1)
+    
     print(f"VoiceCommander (GPU) is active. Press F8 or F9 to start/stop recording.")
     print("GPU acceleration enabled with CUDA.")
+    print("⚠️  GPU-ONLY MODE: Will fail if GPU unavailable (no CPU fallback)")
     if ENABLE_LLM_PROCESSING and GEMINI_API_KEY:
         print("LLM post-processing enabled with Gemini Flash Lite")
     else:
