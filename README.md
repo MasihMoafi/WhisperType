@@ -156,7 +156,3 @@ PRs welcome! Areas for improvement:
 ## 📄 License
 
 MIT License - see [LICENSE](LICENSE) file
-
-## ⚠️ Security Note
-
-**Never commit your `.env` file!** It contains your API key. The `.gitignore` is configured to exclude it. 
