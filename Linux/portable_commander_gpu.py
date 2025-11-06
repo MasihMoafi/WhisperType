@@ -243,11 +243,19 @@ class Recorder:
         env['GGML_CUDA_NO_PINNED'] = '0'   # Enable pinned memory for GPU
         
         result = subprocess.run(command, capture_output=True, text=True, env=env)
-        
-        # Check if GPU was actually used by looking for CPU fallback indicators
+
+        # Check if GPU was actually used - look for actual error indicators, not just word "cpu"
         if ENFORCE_GPU_ONLY and result.stderr:
             stderr_lower = result.stderr.lower()
-            if 'cpu' in stderr_lower or 'fallback' in stderr_lower or 'no cuda' in stderr_lower:
+            # Only fail on actual GPU errors, not system info mentioning CPU features
+            gpu_error_indicators = [
+                'use gpu    = 0' in stderr_lower,  # GPU explicitly disabled
+                'cuda' in stderr_lower and 'error' in stderr_lower,  # CUDA errors
+                'cuda' in stderr_lower and 'failed' in stderr_lower,  # CUDA failures
+                'no cuda' in stderr_lower,  # No CUDA available
+                'gpu not available' in stderr_lower,  # Explicit GPU unavailable message
+            ]
+            if any(gpu_error_indicators):
                 os.remove(tmp_audio_path)
                 print("ERROR: GPU not available or Whisper fell back to CPU!")
                 print("Voice Commander requires GPU. Please check CUDA installation.")
