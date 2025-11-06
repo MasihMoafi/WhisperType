@@ -30,7 +30,7 @@ current_ld_path = os.environ.get('LD_LIBRARY_PATH', '')
 new_paths = [p for p in lib_paths if os.path.exists(p) and p not in current_ld_path]
 if new_paths:
     os.environ['LD_LIBRARY_PATH'] = ":".join(new_paths + [current_ld_path])
-HOTKEYS = [keyboard.Key.f8, keyboard.Key.f9]
+HOTKEYS = [keyboard.Key.f8, keyboard.Key.f9, keyboard.Key.f10, keyboard.Key.f11]
 SAMPLERATE = 16000
 
 # GPU Configuration
@@ -194,12 +194,15 @@ class Recorder:
         self.recording = False
         self.audio_data = []
         self.lock = threading.Lock()
+        self.raw_mode = False
 
-    def start(self):
+    def start(self, raw_mode=False):
         with self.lock:
             if self.recording:
                 return
-            print(">>> Recording started. Press F8 or F9 to stop.")
+            self.raw_mode = raw_mode
+            mode_label = "RAW" if raw_mode else "REFINED"
+            print(f">>> Recording started ({mode_label} mode). Press F8/F9/F10/F11 to stop.")
             self.recording = True
             self.audio_data = []
             threading.Thread(target=self._record_loop, daemon=True).start()
@@ -324,9 +327,14 @@ class Recorder:
                 controller.press(keyboard.Key.esc)
                 controller.release(keyboard.Key.esc)
             else:
-                # Apply LLM refinement for regular text
-                refined_text = refine_with_llm(original_transcribed_text)
-                pyperclip.copy(refined_text)
+                # Apply LLM refinement only if not in raw mode
+                if self.raw_mode:
+                    final_text = original_transcribed_text
+                    print("Raw mode: Skipping LLM refinement")
+                else:
+                    final_text = refine_with_llm(original_transcribed_text)
+
+                pyperclip.copy(final_text)
                 print("Text copied to clipboard. Pasting...")
                 send_paste(controller)
                 print("Paste command sent.")
@@ -337,11 +345,15 @@ class Recorder:
 recorder = Recorder()
 
 def on_press(key):
+    RAW_HOTKEYS = [keyboard.Key.f10, keyboard.Key.f11]
+    REFINED_HOTKEYS = [keyboard.Key.f8, keyboard.Key.f9]
+
     if key in HOTKEYS:
         if recorder.recording:
             recorder.stop_and_process()
         else:
-            recorder.start()
+            raw_mode = key in RAW_HOTKEYS
+            recorder.start(raw_mode=raw_mode)
 
 def main():
     # Verify GPU availability at startup
@@ -358,13 +370,15 @@ def main():
         print("=" * 60)
         sys.exit(1)
     
-    print(f"VoiceCommander (GPU) is active. Press F8 or F9 to start/stop recording.")
+    print(f"VoiceCommander (GPU) is active.")
+    print("  F8/F9:   Start/Stop recording → LLM refinement → paste")
+    print("  F10/F11: Start/Stop recording → raw transcription → paste")
     print("GPU acceleration enabled with CUDA.")
     print("⚠️  GPU-ONLY MODE: Will fail if GPU unavailable (no CPU fallback)")
     if ENABLE_LLM_PROCESSING and GEMINI_API_KEY:
-        print("LLM post-processing enabled with Gemini Flash Lite")
+        print("LLM post-processing enabled with Gemini Flash Lite (F8/F9 mode)")
     else:
-        print("LLM post-processing disabled (set VC_ENABLE_LLM=true and GEMINI_API_KEY)")
+        print("LLM post-processing disabled (F8/F9 will paste raw transcription)")
     print("The transcribed text will be pasted at your cursor's location.")
     print("Close this window or press Ctrl+C to exit.")
     
