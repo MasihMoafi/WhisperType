@@ -1,3 +1,8 @@
+---
+name: Voice Commander ~ (vc)
+type: DEX (software that improves developer experience)
+---
+
 # Voice Commander 🎙️
 
 **Local voice transcription with AI-powered refinement for developers**
@@ -6,13 +11,12 @@ Transform your speech into clean, structured prompts using Whisper.cpp (local, G
 
 ## ✨ Features
 
-- 🎤 **Hotkey Recording**: F8/F9 to start/stop
+- 🎤 **Hotkey Recording**: F8/ F9/ R-Ctrl to start/stop
 - 🚀 **GPU Acceleration**: CUDA-powered Whisper transcription
-- 🤖 **AI Refinement**: Gemini cleans up filler words, fixes grammar, structures output
+- 🤖 **AI Refinement(Optional)**: Gemini-flash cleans up filler words, fixes grammar, structures output
 - 📝 **Structured Output**: XML/JSON/plain text formats
 - 🔒 **Privacy-First**: Transcription runs locally, only refined text hits API
 - ⚡ **Auto-Paste**: Seamlessly inserts text at cursor
-- 🔌 **VS Code Extension**: Integrated workflow
 
 ## 🎬 Demo
 
@@ -20,10 +24,9 @@ https://github.com/user-attachments/assets/1eeacd19-4602-4b91-96ab-f201c0fc4dd9
 
 ## 🎯 Use Cases
 
-- Dictate code comments without "um" and "uh"
+- Dictate code comments with "um" and "uh" 
 - Convert rambling thoughts into structured prompts
-- Hands-free coding when keyboard is unavailable
-- Faster brainstorming and documentation
+- Hands-free coding when keyboard is unavailable or if you just hate typing!
 
 ## Setup
 
@@ -94,13 +97,10 @@ https://github.com/user-attachments/assets/1eeacd19-4602-4b91-96ab-f201c0fc4dd9
    python portable_commander.py
    ```
 
-## VS Code Extension
-See `VScode_extension/` folder for VS Code integration.
-
 ## Usage
-- Press F8 to start recording
-- Press F9 to stop and paste text
-- Works in any application
+- Press F8/ R-ctrl to start recording
+- Press F9/ R-ctrl to stop and paste text
+- Works everywhere; namely inside your terminal.
 
 ## ⚙️ Configuration
 
@@ -121,37 +121,17 @@ Edit `.env` file:
 - Microphone access
 - Gemini API key (free tier available)
 
-## 🧠 How It Works
-
-1. **Press F8** → Start recording
-2. **Speak naturally** → "um, so like, I need a function that uh calculates fibonacci"
-3. **Press F9** → Stop recording
-4. **Whisper transcribes** (local, GPU-accelerated)
-5. **Gemini refines** → Removes fillers, fixes grammar, structures output
-6. **Auto-pastes** → Clean text appears at cursor
-
 **Example:**
 ```
 Input:  "um so like I want to [NOISE] create a function that uh calculates fibonacci"
 Output: <prompt><task>Create a function that calculates the Fibonacci sequence</task></prompt>
 ```
 
-## 🚀 Publishing to Portfolio
-
-This project demonstrates:
-- End-to-end ML pipeline integration
-- GPU optimization (CUDA)
-- API integration (Gemini)
-- Production-ready error handling
-- Real-world developer tooling
-
 ## 🤝 Contributing
 
 PRs welcome! Areas for improvement:
 - Additional LLM providers (OpenAI, Anthropic)
-- Custom prompt templates
 - Multi-language support
-- Voice command macros
 
 ## 📄 License
 

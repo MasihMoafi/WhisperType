@@ -30,7 +30,7 @@ current_ld_path = os.environ.get('LD_LIBRARY_PATH', '')
 new_paths = [p for p in lib_paths if os.path.exists(p) and p not in current_ld_path]
 if new_paths:
     os.environ['LD_LIBRARY_PATH'] = ":".join(new_paths + [current_ld_path])
-HOTKEYS = [keyboard.Key.f8, keyboard.Key.f9, keyboard.Key.f10, keyboard.Key.f11]
+HOTKEYS = [keyboard.Key.f8, keyboard.Key.f9, keyboard.Key.ctrl_r]
 SAMPLERATE = 16000
 
 # GPU Configuration
@@ -202,10 +202,11 @@ class Recorder:
                 return
             self.raw_mode = raw_mode
             mode_label = "RAW" if raw_mode else "REFINED"
-            print(f">>> Recording started ({mode_label} mode). Press F8/F9/F10/F11 to stop.")
+            print(f">>> Recording started ({mode_label} mode). Press Right Ctrl/F8/F9 to stop.")
             self.recording = True
             self.audio_data = []
-            threading.Thread(target=self._record_loop, daemon=True).start()
+            self.record_thread = threading.Thread(target=self._record_loop, daemon=True)
+            self.record_thread.start()
 
     def stop_and_process(self):
         with self.lock:
@@ -214,12 +215,18 @@ class Recorder:
             print(">>> Recording stopped. Processing...")
             self.recording = False
         
-        threading.Thread(target=self._process_audio_data, daemon=True).start()
+        def run_processing():
+            if hasattr(self, 'record_thread'):
+                self.record_thread.join(timeout=1.0)
+            self._process_audio_data()
+            
+        threading.Thread(target=run_processing, daemon=True).start()
 
     def _record_loop(self):
+        chunk_size = 1600  # 100ms chunks to reduce stop latency
         with sd.InputStream(samplerate=SAMPLERATE, channels=1, dtype='int16') as stream:
             while self.recording:
-                audio_chunk, overflowed = stream.read(SAMPLERATE)
+                audio_chunk, overflowed = stream.read(chunk_size)
                 if overflowed:
                     print("Warning: Audio buffer overflowed")
                 with self.lock:
@@ -345,15 +352,11 @@ class Recorder:
 recorder = Recorder()
 
 def on_press(key):
-    RAW_HOTKEYS = [keyboard.Key.f10, keyboard.Key.f11]
-    REFINED_HOTKEYS = [keyboard.Key.f8, keyboard.Key.f9]
-
     if key in HOTKEYS:
         if recorder.recording:
             recorder.stop_and_process()
         else:
-            raw_mode = key in RAW_HOTKEYS
-            recorder.start(raw_mode=raw_mode)
+            recorder.start(raw_mode=False)
 
 def main():
     # Verify GPU availability at startup
@@ -371,14 +374,13 @@ def main():
         sys.exit(1)
     
     print(f"VoiceCommander (GPU) is active.")
-    print("  F8/F9:   Start/Stop recording → LLM refinement → paste")
-    print("  F10/F11: Start/Stop recording → raw transcription → paste")
+    print("  Right Ctrl / F8 / F9: Start/Stop recording → LLM refinement → paste")
     print("GPU acceleration enabled with CUDA.")
     print("⚠️  GPU-ONLY MODE: Will fail if GPU unavailable (no CPU fallback)")
     if ENABLE_LLM_PROCESSING and GEMINI_API_KEY:
-        print("LLM post-processing enabled with Gemini Flash Lite (F8/F9 mode)")
+        print("LLM post-processing enabled with Gemini Flash Lite")
     else:
-        print("LLM post-processing disabled (F8/F9 will paste raw transcription)")
+        print("LLM post-processing disabled")
     print("The transcribed text will be pasted at your cursor's location.")
     print("Close this window or press Ctrl+C to exit.")
     
