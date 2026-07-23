@@ -1,138 +1,198 @@
 ---
-name: Voice Commander ~ (vc)
-type: DEX (software that improves developer experience)
+name: Voice Commander
+type: local voice-input tool for developers working in terminals and editors
 ---
 
-# Voice Commander 🎙️
+# Voice Commander
 
-**Local voice transcription with AI-powered refinement for developers**
+**Voice Commander records speech, transcribes it locally with `whisper.cpp`, and pastes the result at the active cursor.**
 
-Transform your speech into clean, structured prompts using Whisper.cpp (local, GPU-accelerated) + Gemini API (cloud refinement).
+The current primary path is Linux with an NVIDIA GPU. Optional Gemini refinement can remove dictation noise and restructure the transcription before it is pasted.
 
-## ✨ Features
+**Proof available now:** the working Linux implementation, a setup-check script, and the recorded demo below. There is **no small one-command installer or prebuilt bundle today**; setup still requires building `whisper.cpp` and downloading a model.
 
-- 🎤 **Hotkey Recording**: F8/ F9/ R-Ctrl to start/stop
-- 🚀 **GPU Acceleration**: CUDA-powered Whisper transcription
-- 🤖 **AI Refinement(Optional)**: Gemini-flash cleans up filler words, fixes grammar, structures output
-- 📝 **Structured Output**: XML/JSON/plain text formats
-- 🔒 **Privacy-First**: Transcription runs locally, only refined text hits API
-- ⚡ **Auto-Paste**: Seamlessly inserts text at cursor
+## Quick start — Linux + NVIDIA GPU
 
-## 🎬 Demo
+Clone both repositories:
+
+```bash
+git clone https://github.com/MasihMoafi/Voice-commander.git
+cd Voice-commander
+git clone https://github.com/ggerganov/whisper.cpp.git
+```
+
+Build `whisper.cpp` with CUDA:
+
+```bash
+cmake -S whisper.cpp -B whisper.cpp/build -DGGML_CUDA=ON -DCMAKE_BUILD_TYPE=Release
+cmake --build whisper.cpp/build --config Release -j"$(nproc)"
+```
+
+Download the model expected by the current Linux script:
+
+```bash
+bash whisper.cpp/models/download-ggml-model.sh medium.en
+```
+
+Install Python dependencies:
+
+```bash
+python -m pip install sounddevice scipy numpy pyperclip pynput python-dotenv google-genai
+```
+
+Check the local setup:
+
+```bash
+chmod +x Linux/test_setup.sh
+./Linux/test_setup.sh
+```
+
+Run:
+
+```bash
+python Linux/portable_commander_gpu.py
+```
+
+Expected result: press **F8**, **F9**, or **Right Ctrl** to start/stop recording; the transcription is copied and pasted into the active application.
+
+## Demo
 
 https://github.com/user-attachments/assets/1eeacd19-4602-4b91-96ab-f201c0fc4dd9
 
-## 🎯 Use Cases
+The demo is evidence of the recorded workflow, not a benchmark of transcription accuracy or latency across hardware.
 
-- Dictate code comments with "um" and "uh" 
-- Convert rambling thoughts into structured prompts
-- Hands-free coding when keyboard is unavailable or if you just hate typing!
+## The problem
 
-## Setup
+For long prompts, notes, and terminal instructions, typing can become the slowest part of getting an idea into an agent or editor. General dictation tools also tend to preserve filler words and transcription artifacts that are inconvenient in technical prompts.
 
-### Linux (GPU-accelerated)
-1. **Build whisper.cpp with CUDA:**
-   ```bash
-   git clone https://github.com/ggerganov/whisper.cpp.git
-   cd whisper.cpp
-   mkdir build && cd build
-   cmake .. -DGGML_CUDA=ON -DCMAKE_BUILD_TYPE=Release
-   cmake --build . --config Release -j$(nproc)
-   cd ../..
-   ```
+Voice Commander removes that specific friction by combining local speech-to-text with direct cursor insertion and optional post-processing.
 
-2. **Download model:**
-   ```bash
-   cd whisper.cpp/models
-   bash download-ggml-model.sh medium.en
-   cd ../..
-   ```
+## How it works
 
-3. **Install Python dependencies:**
-   ```bash
-   pip install sounddevice scipy numpy pyperclip pynput python-dotenv google-genai
-   ```
-
-4. **Configure AI refinement (optional but recommended):**
-   
-   Copy the example config:
-   ```bash
-   cp .env.example .env
-   ```
-   
-   Edit `.env` and add your Gemini API key:
-   ```bash
-   GEMINI_API_KEY=your-api-key-here
-   VC_ENABLE_LLM=true
-   VC_LLM_FORMAT=xml  # Options: plain, xml, json
-   ```
-   
-   Get a free API key: https://aistudio.google.com/apikey
-
-5. **Run Voice Commander:**
-   ```bash
-   python Linux/portable_commander_gpu.py
-   ```
-
-### macOS/Windows
-1. **Install whisper.cpp:**
-   ```bash
-   git clone https://github.com/ggerganov/whisper.cpp.git
-   cd whisper.cpp
-   make
-   ```
-
-2. **Download model:**
-   ```bash
-   bash ./models/download-ggml-model.sh medium.en
-   ```
-
-3. **Install Python dependencies:**
-   ```bash
-   pip install sounddevice scipy numpy pyperclip pynput
-   ```
-
-4. **Run Voice Commander:**
-   ```bash
-   python portable_commander.py
-   ```
-
-## Usage
-- Press F8/ R-ctrl to start recording
-- Press F9/ R-ctrl to stop and paste text
-- Works everywhere; namely inside your terminal.
-
-## ⚙️ Configuration
-
-Edit `.env` file:
-
-| Variable | Options | Default | Description |
-|----------|---------|---------|-------------|
-| `VC_ENABLE_LLM` | `true`/`false` | `true` | Enable AI refinement |
-| `VC_LLM_FORMAT` | `plain`/`xml`/`json` | `xml` | Output structure |
-| `GEMINI_API_KEY` | Your API key | - | Required for refinement |
-| `VC_PASTE_MODE` | `auto`/`ctrl_v`/`ctrl_shift_v` | `auto` | Paste behavior |
-
-## 📋 Requirements
-
-- Python 3.7+
-- CUDA-capable GPU (for acceleration)
-- whisper.cpp compiled in parent directory
-- Microphone access
-- Gemini API key (free tier available)
-
-**Example:**
+```text
+microphone
+   ↓
+16 kHz audio capture
+   ↓
+whisper.cpp / medium.en
+   ↓
+raw transcription
+   ↓
+optional Gemini refinement
+   ↓
+clipboard
+   ↓
+active terminal/editor
 ```
+
+The current Linux implementation:
+
+- records microphone audio with `sounddevice`;
+- invokes the locally built `whisper-cli` executable;
+- requires an NVIDIA GPU in the primary Linux path rather than silently falling back to CPU;
+- optionally sends the **transcribed text**, not the audio, to Gemini when refinement is enabled;
+- pastes with `Ctrl+V` or `Ctrl+Shift+V` depending on the focused application and `VC_PASTE_MODE`.
+
+## Configuration
+
+Copy the example environment file:
+
+```bash
+cp .env.example .env
+```
+
+For optional Gemini refinement:
+
+```bash
+GEMINI_API_KEY=your-api-key-here
+VC_ENABLE_LLM=true
+VC_LLM_FORMAT=xml
+```
+
+Supported output-format values in the current Linux script:
+
+| Variable | Values | Purpose |
+| --- | --- | --- |
+| `VC_ENABLE_LLM` | `true` / `false` | Enable or disable Gemini post-processing |
+| `VC_LLM_FORMAT` | `plain` / `xml` / `json` | Shape of refined text |
+| `GEMINI_API_KEY` | API key | Required only when refinement is enabled |
+| `VC_PASTE_MODE` | `auto` / `ctrl_v` / `ctrl_shift_v` | Paste-key behavior |
+
+Without `GEMINI_API_KEY`, the Linux implementation falls back to the local Whisper transcription.
+
+## Current state
+
+### Implemented
+
+- Linux microphone recording and hotkey control.
+- CUDA-backed `whisper.cpp` transcription using `ggml-medium.en.bin`.
+- Clipboard insertion into the active application.
+- Terminal-aware paste-key selection on X11.
+- Optional Gemini text refinement with plain/XML/JSON output modes.
+- Local setup diagnostics in [`Linux/test_setup.sh`](Linux/test_setup.sh).
+
+### Implemented but not continuously verified
+
+- The repository has local diagnostic/test scripts, but no CI currently proves end-to-end microphone → Whisper → refinement → paste behavior on a clean machine.
+- Desktop/window behavior depends on the local Linux environment. The terminal-detection helper is specifically X11-aware.
+
+### Planned / unresolved
+
+- Easier packaging and installation. The current dependency footprint makes a simple downloadable bundle impractical without additional packaging work.
+- Broader platform acceptance testing.
+- Multi-language support.
+- Additional refinement-provider options only when there is a maintained implementation path.
+
+### Not claimed as supported today
+
+- A one-command install.
+- A small standalone binary/package.
+- Verified macOS support.
+- Verified Windows end-to-end support.
+- CPU fallback in the primary Linux GPU script.
+
+There are Windows-specific files in the repository, but this README does not present them as a verified release path without current acceptance evidence.
+
+## What sets the design apart
+
+These are implementation choices, not novelty claims:
+
+- **Local transcription:** microphone audio is processed through local `whisper.cpp`.
+- **Optional cloud refinement:** only the transcription text is sent to Gemini when enabled.
+- **Cursor-first workflow:** output is intended to land directly where the developer is already typing rather than in a separate transcription UI.
+- **Fail-closed GPU path:** the current Linux GPU script explicitly checks for NVIDIA availability rather than silently changing execution mode.
+
+## Evals and test series
+
+Run the setup diagnostic:
+
+```bash
+./Linux/test_setup.sh
+```
+
+It checks Python, required Python imports, NVIDIA/CUDA availability, the compiled Whisper executable, and the expected model file.
+
+What that proves: the required local pieces are present and the expected GPU executable/model paths exist.
+
+What it does **not** prove: microphone quality, transcription accuracy, Gemini availability, paste behavior in every desktop environment, or cross-platform support.
+
+`Linux/test_llm_integration.py` targets an older Ollama/Qwen refinement path and should not be treated as verification of the current Gemini path.
+
+The smallest useful missing test is an automated smoke test around a fixed WAV fixture that verifies Whisper output and the current refinement adapter without requiring live microphone input.
+
+## Example
+
+```text
 Input:  "um so like I want to [NOISE] create a function that uh calculates fibonacci"
 Output: <prompt><task>Create a function that calculates the Fibonacci sequence</task></prompt>
 ```
 
-## 🤝 Contributing
+This is an example of the refinement transformation, not a guaranteed output for every model response.
 
-PRs welcome! Areas for improvement:
-- Additional LLM providers (OpenAI, Anthropic)
-- Multi-language support
+## Future development
 
-## 📄 License
+The main adoption blocker is installation, not another feature list. The next useful work is a smaller, reproducible distribution path with clean-machine verification before expanding the product surface.
 
-MIT License - see [LICENSE](LICENSE) file
+## License
+
+MIT — see [LICENSE](LICENSE).
