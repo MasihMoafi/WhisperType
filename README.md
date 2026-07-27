@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/voice-commander-hero-1.svg" alt="Voice Commander" width="190"><img src="docs/assets/voice-commander-hero-2.svg" alt="" width="190"><img src="docs/assets/voice-commander-hero-3.svg" alt="" width="190"><img src="docs/assets/voice-commander-hero-4.svg" alt="" width="190">
+<img src="vc-elpis.png" alt="Voice Commander" width="760">
 
 <br>
 
