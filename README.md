@@ -1,11 +1,25 @@
----
-name: Voice Commander
-type: local voice-input tool for developers working in terminals and editors
----
+<div align="center">
 
-# Voice Commander
+<img src="docs/assets/voice-commander-hero-1.svg" alt="Voice Commander" width="190"><img src="docs/assets/voice-commander-hero-2.svg" alt="" width="190"><img src="docs/assets/voice-commander-hero-3.svg" alt="" width="190"><img src="docs/assets/voice-commander-hero-4.svg" alt="" width="190">
 
-**Voice Commander records speech, transcribes it locally with `whisper.cpp`, and pastes the result at the active cursor.**
+<br>
+
+**Local voice input for developers: speak, transcribe locally, and paste at the cursor.**
+
+[![Linux](https://img.shields.io/badge/Linux-NVIDIA%20GPU-2ea44f?style=flat-square)](#quick-start--linux--nvidia-gpu)
+[![Transcription](https://img.shields.io/badge/transcription-whisper.cpp-blue?style=flat-square)](#how-it-works)
+[![Refinement](https://img.shields.io/badge/Gemini-optional-blueviolet?style=flat-square)](#configuration)
+[![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
+
+[Install](#quick-start--linux--nvidia-gpu) • [Demo](#demo) • [How it works](#how-it-works) • [Status](#current-state)
+
+</div>
+
+## What is Voice Commander
+
+> *Speak instead of typing.*
+
+Voice Commander records speech, transcribes it locally with `whisper.cpp`, and pastes the result at the active cursor.
 
 The current primary path is Linux with an NVIDIA GPU. Optional Gemini refinement can remove dictation noise and restructure the transcription before it is pasted.
 
