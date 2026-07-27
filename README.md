@@ -71,7 +71,7 @@ Expected result: press **F8**, **F9**, or **Right Ctrl** to start/stop recording
 
 ## Demo
 
-https://github.com/user-attachments/assets/1eeacd19-4602-4b91-96ab-f201c0fc4dd9
+[demo.mp4](demo.mp4)
 
 The demo is evidence of the recorded workflow, not a benchmark of transcription accuracy or latency across hardware.
 
