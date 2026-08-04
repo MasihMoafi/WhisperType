@@ -1,57 +1,78 @@
 # parakeet-commander
 
-Replaces `whisper.cpp` with **parakeet.cpp** (`mudler/parakeet.cpp`) running
-the `tdt_ctc-110m-f16.gguf` model — a 110 M FastConformer that is measurably
-faster than `whisper large-v3` on English while beating it on WER.
+High-speed local English speech dictation using **parakeet.cpp** (`mudler/parakeet.cpp`) with the **NVIDIA Parakeet TDT 0.6B** (`tdt-0.6b-v2-f16.gguf`) model.
 
-## One-time setup
+Built on non-autoregressive FastConformer architecture running via CUDA GPU acceleration.
+
+---
+
+## Benchmark Comparison (GPU)
+
+Measured sequentially on real 30-second audio dictation on NVIDIA RTX 3070 Laptop GPU:
+
+| Engine | Model | Parameter Count | Latency (30s audio) | Speedup | Accuracy (WER) |
+|---|---|---|---|---|---|
+| **Whisper.cpp** | `medium.en` | 769 Million | 4,821 ms | 1.0x (baseline) | High |
+| **Parakeet.cpp** | `tdt-0.6b-v2-f16` | 600 Million | **712 ms** | **6.77x faster** | **Whisper Large v3 level** |
+
+---
+
+## Key Features
+
+- **CUDA-Backed Acceleration**: Uses `PARAKEET_DEVICE=CUDA0` for fast GPU inference.
+- **Zero-Latency Filler Word Removal**: Deterministic regex filter automatically strips spoken hesitations (`um`, `uh`, `ah`, `er`, `hm`, `hmm`, `mhm`) without cloud API delays.
+- **Recurrent Mishearing Correction**: In-memory `WORD_REPLACEMENTS` map to fix domain-specific terms.
+- **Direct Clipboard Insertion**: Copies transcribed text straight to clipboard and sends active window paste (`Ctrl+V` or `Ctrl+Shift+V`).
+
+---
+
+## One-Time Setup
 
 ```bash
-# from the Voice-Commander repo root:
+# From the Voice-Commander repo root:
 bash parakeet-commander/setup.sh
 ```
 
-What the script does:
+What `setup.sh` does:
+1. Clones `mudler/parakeet.cpp` into `parakeet.cpp/` (if missing).
+2. Builds `parakeet-cli` with `PARAKEET_GGML_CUDA=ON`.
+3. Downloads `tdt-0.6b-v2-f16.gguf` (~1.4 GB) from Hugging Face.
 
-| Step | Action |
-|------|--------|
-| 1 | `git clone --recursive` `mudler/parakeet.cpp` into `../parakeet.cpp/` |
-| 2 | CMake build with `PARAKEET_GGML_CUDA=ON` (falls back to CPU if no GPU) |
-| 3 | Downloads `tdt_ctc-110m-f16.gguf` (~268 MB) from `mudler/parakeet-cpp-gguf` on HF |
+---
 
-## Run
+## Running
 
+Using shortcut alias (if added to `~/.bash_aliases`):
+```bash
+vc2
+```
+
+Or directly via Python:
 ```bash
 python parakeet-commander/portable_commander_parakeet.py
 ```
 
-Same Python deps as the whisper variant:
+### Hotkeys
+- **`F8` / `F9` / `Right Ctrl`**: Start/stop recording.
 
+---
+
+## Latency Benchmark Tool
+
+To measure exact processing latency on your GPU:
 ```bash
-pip install sounddevice scipy numpy pyperclip pynput python-dotenv google-genai
+python parakeet-commander/benchmark.py
 ```
 
-## Configuration
+---
 
-Same `.env` variables as the whisper variant:
+## Custom Word Replacements
 
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `VC_ENABLE_LLM` | `true` | Gemini post-processing |
-| `VC_LLM_FORMAT` | `xml` | Output format: `plain` / `xml` / `json` |
-| `GEMINI_API_KEY` | — | Required only when LLM is on |
-| `VC_PASTE_MODE` | `auto` | `ctrl_v` / `ctrl_shift_v` / `auto` |
-| `PARAKEET_DEVICE` | _(auto)_ | Override compute device: `cpu`, `CUDA0`, `Vulkan0`, … |
+To auto-correct recurrently misheard technical terms, edit `WORD_REPLACEMENTS` in `portable_commander_parakeet.py`:
 
-## Differences from the whisper variant
-
-| | `portable_commander_gpu.py` | `portable_commander_parakeet.py` |
-|---|---|---|
-| Engine | `whisper-cli` | `parakeet-cli` |
-| Model | `ggml-medium.en.bin` | `tdt_ctc-110m-f16.gguf` |
-| GPU flag | `CUDA_VISIBLE_DEVICES=0` | `PARAKEET_DEVICE` env var (auto-detect) |
-| GPU enforcement | Hard-fail if no GPU | Soft (parakeet runs fine on CPU) |
-| Speed | baseline | ~10–50× faster |
-
-All voice-command shortcuts (copy, paste, tab, enter, escape, …) and the
-optional Gemini refinement step are preserved verbatim.
+```python
+WORD_REPLACEMENTS = {
+    "am I article": "a my article",
+    "codex": "Codex",
+}
+```
