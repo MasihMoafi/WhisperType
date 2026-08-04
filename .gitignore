@@ -2,12 +2,14 @@
 .env
 .env.local
 
-# Whisper.cpp - exclude entire directory (users should clone separately)
+# Whisper.cpp & Parakeet submodules - exclude heavy source/build dirs
 whisper.cpp/
+parakeet.cpp/
 
 # Model files
 *.bin
 *.ggml
+*.gguf
 
 # Python
 __pycache__/

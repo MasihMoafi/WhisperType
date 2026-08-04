@@ -285,7 +285,6 @@ class Recorder:
             print(f"Transcribed: {original_transcribed_text}")
 
             controller = keyboard.Controller()
-
             if command_text == "copy":
                 print("Executing: Copy")
                 with controller.pressed(keyboard.Key.ctrl):
@@ -335,7 +334,6 @@ class Recorder:
                 controller.press(keyboard.Key.esc)
                 controller.release(keyboard.Key.esc)
             else:
-                # Apply LLM refinement only if not in raw mode
                 if self.raw_mode:
                     final_text = original_transcribed_text
                     print("Raw mode: Skipping LLM refinement")
