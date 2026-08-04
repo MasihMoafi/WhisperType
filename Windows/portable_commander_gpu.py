@@ -104,12 +104,13 @@ class Recorder:
 
         if original_transcribed_text:
             transcribed_text = original_transcribed_text.lower()
+            command_text = transcribed_text.strip().rstrip("!.,;:")
             print(f"Transcribed: {original_transcribed_text}")
 
             controller = keyboard.Controller()
 
             # --- Voice Command Logic (Preserved from original) ---
-            if transcribed_text.startswith("copy"):
+            if command_text == "copy":
                 print("Executing: Copy")
                 with controller.pressed(keyboard.Key.ctrl):
                     controller.press('c')
@@ -117,7 +118,7 @@ class Recorder:
                 with controller.pressed(keyboard.Key.ctrl, keyboard.Key.shift):
                     controller.press('c')
                     controller.release('c')
-            elif transcribed_text.startswith("paste"):
+            elif command_text == "paste":
                 print("Executing: Paste")
                 with controller.pressed(keyboard.Key.ctrl):
                     controller.press('v')
@@ -125,40 +126,40 @@ class Recorder:
                 with controller.pressed(keyboard.Key.ctrl, keyboard.Key.shift):
                     controller.press('v')
                     controller.release('v')
-            elif transcribed_text.startswith("tab") or transcribed_text.startswith("tap"):
+            elif command_text == "tab" or command_text == "tap":
                 print("Executing: Alt+Tab")
                 with controller.pressed(keyboard.Key.alt):
                     controller.press(keyboard.Key.tab)
                     controller.release(keyboard.Key.tab)
-            elif transcribed_text.startswith("dash"):
+            elif command_text == "dash":
                 print("Executing: Alt+-")
                 with controller.pressed(keyboard.Key.alt):
                     controller.press('-')
                     controller.release('-')
-            elif transcribed_text.startswith("switch"):
+            elif command_text == "switch":
                 print("Executing: Ctrl+PageDown (Next Terminal Tab)")
                 with controller.pressed(keyboard.Key.ctrl):
                     controller.press(keyboard.Key.page_down)
                     controller.release(keyboard.Key.page_down)
-            elif transcribed_text.startswith("desktop"):
+            elif command_text == "desktop":
                 print("Executing: Super+D (Show Desktop)")
                 with controller.pressed(keyboard.Key.cmd): # 'cmd' is the Super/Windows key
                     controller.press('d')
                     controller.release('d')
-            elif transcribed_text.startswith("exit"):
+            elif command_text == "exit":
                 print("Executing: Ctrl+D")
                 with controller.pressed(keyboard.Key.ctrl):
                     controller.press('d')
                     controller.release('d')
-            elif transcribed_text.startswith("enter"):
+            elif command_text == "enter":
                 print("Executing: Enter")
                 controller.press(keyboard.Key.enter)
                 controller.release(keyboard.Key.enter)
-            elif transcribed_text.startswith("delete"):
+            elif command_text == "delete":
                 print("Executing: Delete")
                 controller.press(keyboard.Key.delete)
                 controller.release(keyboard.Key.delete)
-            elif transcribed_text.startswith("escape"):
+            elif command_text == "escape":
                 print("Executing: Escape")
                 controller.press(keyboard.Key.esc)
                 controller.release(keyboard.Key.esc)
