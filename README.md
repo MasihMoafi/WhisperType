@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="vc-elpis.png" alt="Voice Commander" width="760">
+<img src="vc-elpis.png" alt="WhisperType" width="760">
 
 <br>
 
@@ -15,11 +15,11 @@
 
 </div>
 
-## What is Voice Commander
+## What is WhisperType
 
 > *Speak instead of typing.*
 
-Voice Commander records speech, transcribes it locally with `whisper.cpp`, and pastes the result at the active cursor.
+WhisperType records speech, transcribes it locally with `whisper.cpp`, and pastes the result at the active cursor. The CLI alias remains **`vc`**.
 
 The current primary path is Linux with an NVIDIA GPU. Optional Gemini refinement can remove dictation noise and restructure the transcription before it is pasted.
 
@@ -30,8 +30,8 @@ The current primary path is Linux with an NVIDIA GPU. Optional Gemini refinement
 Clone both repositories:
 
 ```bash
-git clone https://github.com/MasihMoafi/Voice-commander.git
-cd Voice-commander
+git clone https://github.com/MasihMoafi/Voice-commander.git WhisperType
+cd WhisperType
 git clone https://github.com/ggerganov/whisper.cpp.git
 ```
 
@@ -79,7 +79,7 @@ The demo is evidence of the recorded workflow, not a benchmark of transcription 
 
 For long prompts, notes, and terminal instructions, typing can become the slowest part of getting an idea into an agent or editor. General dictation tools also tend to preserve filler words and transcription artifacts that are inconvenient in technical prompts.
 
-Voice Commander removes that specific friction by combining local speech-to-text with direct cursor insertion and optional post-processing.
+WhisperType removes that specific friction by combining local speech-to-text with direct cursor insertion and optional post-processing.
 
 ## How it works
 
