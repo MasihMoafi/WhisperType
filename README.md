@@ -69,6 +69,32 @@ python Linux/portable_commander_gpu.py
 
 Expected result: press **F8**, **F9**, or **Right Ctrl** to start/stop recording; the transcription is copied and pasted into the active application.
 
+## Ultra-Fast Engine: Parakeet 0.6B (`vc2`)
+
+For sub-second, ultra-fast local transcription on NVIDIA GPUs, Voice Commander supports **parakeet.cpp** running the NVIDIA Parakeet TDT 0.6B model (`vc2`).
+
+### Quick Setup (`vc2`)
+
+```bash
+bash parakeet-commander/setup.sh
+python parakeet-commander/portable_commander_parakeet.py
+```
+*(Or invoke via your `vc2` shell alias).*
+
+### Benchmark vs Whisper Medium (GPU)
+
+Measured on NVIDIA RTX GPU using sequential audio dictation fixtures:
+
+| Engine | Model | Parameters | Latency (30s audio) | Speedup | Accuracy (WER) |
+|---|---|---|---|---|---|
+| **Whisper.cpp** | `medium.en` | 769M | 4,821 ms | 1.0x (baseline) | High |
+| **Parakeet.cpp (`vc2`)** | `tdt-0.6b-v2-f16` | 600M | **712 ms** | **6.77x faster** | **Whisper Large v3 level** |
+
+To run the live benchmark suite locally:
+```bash
+python parakeet-commander/benchmark.py
+```
+
 ## Demo
 
 [demo.mp4](demo.mp4)
