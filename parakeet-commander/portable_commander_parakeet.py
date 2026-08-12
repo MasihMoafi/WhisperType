@@ -204,10 +204,51 @@ class Recorder:
             print("No transcription produced."); return
 
         print(f"Transcribed: {text}")
-        pyperclip.copy(text)
-        print("Pasting...")
+        command_text = text.lower().strip().rstrip("!.,;:")
         ctrl = keyboard.Controller()
-        send_paste(ctrl)
+
+        if command_text == "copy":
+            print("Executing: Copy")
+            with ctrl.pressed(keyboard.Key.ctrl):
+                ctrl.press('c'); ctrl.release('c')
+            with ctrl.pressed(keyboard.Key.ctrl, keyboard.Key.shift):
+                ctrl.press('c'); ctrl.release('c')
+        elif command_text == "paste":
+            print("Executing: Paste")
+            send_paste(ctrl)
+        elif command_text in ("tab", "tap"):
+            print("Executing: Alt+Tab")
+            with ctrl.pressed(keyboard.Key.alt):
+                ctrl.press(keyboard.Key.tab); ctrl.release(keyboard.Key.tab)
+        elif command_text == "dash":
+            print("Executing: Alt+-")
+            with ctrl.pressed(keyboard.Key.alt):
+                ctrl.press('-'); ctrl.release('-')
+        elif command_text == "switch":
+            print("Executing: Ctrl+PageDown (Next Terminal Tab)")
+            with ctrl.pressed(keyboard.Key.ctrl):
+                ctrl.press(keyboard.Key.page_down); ctrl.release(keyboard.Key.page_down)
+        elif command_text == "desktop":
+            print("Executing: Super+D (Show Desktop)")
+            with ctrl.pressed(keyboard.Key.cmd):
+                ctrl.press('d'); ctrl.release('d')
+        elif command_text == "exit":
+            print("Executing: Ctrl+D")
+            with ctrl.pressed(keyboard.Key.ctrl):
+                ctrl.press('d'); ctrl.release('d')
+        elif command_text == "enter":
+            print("Executing: Enter")
+            ctrl.press(keyboard.Key.enter); ctrl.release(keyboard.Key.enter)
+        elif command_text == "delete":
+            print("Executing: Delete")
+            ctrl.press(keyboard.Key.delete); ctrl.release(keyboard.Key.delete)
+        elif command_text == "escape":
+            print("Executing: Escape")
+            ctrl.press(keyboard.Key.esc); ctrl.release(keyboard.Key.esc)
+        else:
+            pyperclip.copy(text)
+            print("Pasting...")
+            send_paste(ctrl)
 
 
 # ── WIRING ────────────────────────────────────────────────────────────────────
