@@ -18,6 +18,8 @@ __pycache__/
 *.pyd
 .Python
 venv/
+.venv/
+.mcp.json
 env/
 ENV/
 

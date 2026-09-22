@@ -5,7 +5,7 @@ GPU-accelerated voice transcription with CUDA support.
 ## Run
 
 ```bash
-python Linux/portable_commander_gpu.py
+./run-whisper.sh
 ```
 
 ## Usage

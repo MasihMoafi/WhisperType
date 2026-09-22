@@ -24,8 +24,8 @@ WHISPER_MODEL_PATH = os.path.join(WHISPER_CPP_DIR, "models", "ggml-medium.en.bin
 # Add whisper library paths to LD_LIBRARY_PATH
 WHISPER_LIB_DIR = os.path.join(WHISPER_CPP_DIR, "build", "src")
 GGML_LIB_DIR = os.path.join(WHISPER_CPP_DIR, "build", "ggml", "src")
-GGML_CUDA_DIR = os.path.join(WHISPER_CPP_DIR, "build", "ggml", "src", "ggml-cuda")
-lib_paths = [WHISPER_LIB_DIR, GGML_LIB_DIR, GGML_CUDA_DIR]
+WHISPER_BIN_DIR = os.path.join(WHISPER_CPP_DIR, "build", "bin")
+lib_paths = [WHISPER_BIN_DIR, WHISPER_LIB_DIR, GGML_LIB_DIR]
 current_ld_path = os.environ.get('LD_LIBRARY_PATH', '')
 new_paths = [p for p in lib_paths if os.path.exists(p) and p not in current_ld_path]
 if new_paths:
@@ -82,7 +82,9 @@ def _is_terminal_focused_linux():
     }
     return any(cls in terminal_hints for cls in classes)
 
-def send_paste(controller: keyboard.Controller):
+def send_paste(controller: keyboard.Controller = None):
+    import time
+    time.sleep(0.05)
     mode = os.environ.get("VC_PASTE_MODE", "auto").strip().lower()
     if mode not in {"auto","ctrl_v","ctrl_shift_v"}:
         mode = "auto"
@@ -90,6 +92,50 @@ def send_paste(controller: keyboard.Controller):
         chosen = "ctrl_shift_v" if sys.platform.startswith("linux") and _is_terminal_focused_linux() else "ctrl_v"
     else:
         chosen = mode
+
+    # 1. Try kernel-level uinput injection via evdev (works on Wayland and X11)
+    try:
+        from evdev import UInput, ecodes
+        cap = {ecodes.EV_KEY: [ecodes.KEY_LEFTCTRL, ecodes.KEY_LEFTSHIFT, ecodes.KEY_V]}
+        with UInput(cap, name="whispertype-virtual-keyboard") as ui:
+            ui.write(ecodes.EV_KEY, ecodes.KEY_LEFTCTRL, 1)
+            if chosen == "ctrl_shift_v":
+                ui.write(ecodes.EV_KEY, ecodes.KEY_LEFTSHIFT, 1)
+            ui.syn()
+            time.sleep(0.01)
+
+            ui.write(ecodes.EV_KEY, ecodes.KEY_V, 1)
+            ui.syn()
+            time.sleep(0.01)
+            ui.write(ecodes.EV_KEY, ecodes.KEY_V, 0)
+            ui.syn()
+            time.sleep(0.01)
+
+            if chosen == "ctrl_shift_v":
+                ui.write(ecodes.EV_KEY, ecodes.KEY_LEFTSHIFT, 0)
+            ui.write(ecodes.EV_KEY, ecodes.KEY_LEFTCTRL, 0)
+            ui.syn()
+            return
+    except Exception:
+        pass
+
+    # 2. Try ydotool if installed
+    try:
+        env = os.environ.copy()
+        uid = os.getuid()
+        for sock in [f"/run/user/{uid}/ydotoold.socket", "/tmp/.ydotool_socket"]:
+            if os.path.exists(sock):
+                env["YDOTOOL_SOCKET"] = sock
+                break
+        keys = ["29:1", "42:1", "47:1", "47:0", "42:0", "29:0"] if chosen == "ctrl_shift_v" else ["29:1", "47:1", "47:0", "29:0"]
+        if subprocess.run(["ydotool", "key"] + keys, capture_output=True, env=env).returncode == 0:
+            return
+    except Exception:
+        pass
+
+    # 3. Fallback to pynput
+    if controller is None:
+        controller = keyboard.Controller()
     if chosen == "ctrl_shift_v":
         with controller.pressed(keyboard.Key.ctrl, keyboard.Key.shift):
             controller.press('v')
@@ -98,6 +144,7 @@ def send_paste(controller: keyboard.Controller):
         with controller.pressed(keyboard.Key.ctrl):
             controller.press('v')
             controller.release('v')
+
 
 def refine_with_llm(text):
     """Post-process transcribed text with Gemini API"""
@@ -349,13 +396,37 @@ class Recorder:
             print(result.stderr)
 
 recorder = Recorder()
+_last_toggle_time = 0
+_toggle_lock = threading.Lock()
 
-def on_press(key):
-    if key in HOTKEYS:
+
+def toggle_recording():
+    global _last_toggle_time
+    import time
+    with _toggle_lock:
+        now = time.time()
+        if now - _last_toggle_time < 0.3:
+            return
+        _last_toggle_time = now
         if recorder.recording:
             recorder.stop_and_process()
         else:
             recorder.start(raw_mode=False)
+
+
+def is_hotkey(key):
+    """Accept only explicitly configured pynput keys.
+
+    Avoid raw numeric virtual-key fallbacks: on Linux, mouse/media devices
+    can expose keyboard-like key codes and accidentally trigger recording.
+    """
+    return key in HOTKEYS
+
+
+def on_press(key):
+    if is_hotkey(key):
+        toggle_recording()
+
 
 def main():
     # Verify GPU availability at startup
@@ -371,7 +442,7 @@ def main():
         print("\nSet ENFORCE_GPU_ONLY=False in code to allow CPU fallback.")
         print("=" * 60)
         sys.exit(1)
-    
+
     print(f"VoiceCommander (GPU) is active.")
     print("  Right Ctrl / F8 / F9: Start/Stop recording → LLM refinement → paste")
     print("GPU acceleration enabled with CUDA.")
@@ -382,9 +453,10 @@ def main():
         print("LLM post-processing disabled")
     print("The transcribed text will be pasted at your cursor's location.")
     print("Close this window or press Ctrl+C to exit.")
-    
+
     with keyboard.Listener(on_press=on_press) as listener:
         listener.join()
+
 
 if __name__ == "__main__":
     main()

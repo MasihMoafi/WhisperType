@@ -1,7 +1,8 @@
-sounddevice>=0.4.6
-scipy>=1.10.0
-numpy>=1.24.0
-pyperclip>=1.8.2
-pynput>=1.7.6
-python-dotenv>=1.0.0
-google-genai>=0.3.0
+sounddevice==0.5.2
+scipy==1.16.2
+numpy==2.3.3
+pyperclip==1.11.0
+pynput==1.8.1
+python-dotenv==1.1.1
+google-genai==1.41.0
+evdev==1.9.2; sys_platform == "linux"
