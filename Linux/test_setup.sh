@@ -1,93 +1,99 @@
-#!/bin/bash
-# Quick test script to check Voice Commander setup
+#!/usr/bin/env bash
+set -u
 
-echo "=== Voice Commander Setup Check ==="
-echo ""
-
-# Check Python
-echo "1. Python:"
-if command -v python &> /dev/null; then
-    python --version
-    echo "   ✓ 'python' command available"
-else
-    echo "   ✗ 'python' command not found"
-fi
-
-if command -v python3 &> /dev/null; then
-    python3 --version
-    echo "   ✓ 'python3' command available"
-else
-    echo "   ✗ 'python3' command not found"
-fi
-
-echo ""
-echo "2. Python Dependencies:"
-python3 -c "import sounddevice" 2>/dev/null && echo "   ✓ sounddevice" || echo "   ✗ sounddevice"
-python3 -c "import scipy" 2>/dev/null && echo "   ✓ scipy" || echo "   ✗ scipy"
-python3 -c "import numpy" 2>/dev/null && echo "   ✓ numpy" || echo "   ✗ numpy"
-python3 -c "import pyperclip" 2>/dev/null && echo "   ✓ pyperclip" || echo "   ✗ pyperclip"
-python3 -c "import pynput" 2>/dev/null && echo "   ✓ pynput" || echo "   ✗ pynput"
-
-echo ""
-echo "3. NVIDIA GPU:"
-if command -v nvidia-smi &> /dev/null; then
-    nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader
-    echo "   ✓ NVIDIA GPU detected"
-else
-    echo "   ✗ NVIDIA GPU not detected"
-fi
-
-echo ""
-echo "4. CUDA Toolkit:"
-if command -v nvcc &> /dev/null; then
-    nvcc --version | grep "release"
-    echo "   ✓ CUDA toolkit installed"
-else
-    echo "   ✗ CUDA toolkit not found (optional for rebuild)"
-fi
-
-echo ""
-echo "5. Whisper.cpp:"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE_DIR="$(dirname "$SCRIPT_DIR")"
-WHISPER_CLI="$BASE_DIR/whisper.cpp/build/bin/whisper-cli"
-
-if [ -f "$WHISPER_CLI" ]; then
-    echo "   ✓ whisper-cli found at: $WHISPER_CLI"
-    
-    # Check for CUDA support
-    if ldd "$WHISPER_CLI" 2>/dev/null | grep -q cuda; then
-        echo "   ✓ Built with CUDA support"
-    else
-        echo "   ⚠ Built WITHOUT CUDA support (CPU only)"
-        echo "     Run ./Linux/setup_gpu.sh to rebuild with GPU support"
-    fi
-else
-    echo "   ✗ whisper-cli not found"
-fi
-
-echo ""
-echo "6. Whisper Model:"
 MODEL_PATH="$BASE_DIR/whisper.cpp/models/ggml-medium.en.bin"
-if [ -f "$MODEL_PATH" ]; then
-    SIZE=$(du -h "$MODEL_PATH" | cut -f1)
-    echo "   ✓ Model found: $SIZE"
+if [[ -x "$BASE_DIR/whisper.cpp/build-whispertype/bin/whisper-cli" ]]; then
+    WHISPER_BUILD_DIR="$BASE_DIR/whisper.cpp/build-whispertype"
 else
-    echo "   ✗ Model not found at: $MODEL_PATH"
+    WHISPER_BUILD_DIR="$BASE_DIR/whisper.cpp/build"
+fi
+WHISPER_CLI="$WHISPER_BUILD_DIR/bin/whisper-cli"
+WHISPER_LIB_DIR="$WHISPER_BUILD_DIR/bin"
+EXPECTED_MODEL_SHA256="cc37e93478338ec7700281a7ac30a10128929eb8f427dda2e865faa8f6da4356"
+FAILURES=0
+
+pass() { printf '   ✓ %s\n' "$1"; }
+fail() { printf '   ✗ %s\n' "$1"; FAILURES=$((FAILURES + 1)); }
+warn() { printf '   ⚠ %s\n' "$1"; }
+
+if [[ -n "${WHISPERTYPE_PYTHON:-}" ]]; then
+    PYTHON="$WHISPERTYPE_PYTHON"
+elif [[ -x "$BASE_DIR/.venv/bin/python" ]]; then
+    PYTHON="$BASE_DIR/.venv/bin/python"
+elif command -v python3.12 >/dev/null 2>&1; then
+    PYTHON="$(command -v python3.12)"
+else
+    PYTHON="$(command -v python3 2>/dev/null || true)"
 fi
 
-echo ""
-echo "=== Summary ==="
-if [ -f "$WHISPER_CLI" ] && [ -f "$MODEL_PATH" ]; then
-    if ldd "$WHISPER_CLI" 2>/dev/null | grep -q cuda; then
-        echo "✓ Ready to run with GPU acceleration!"
-        echo "  Run: python Linux/portable_commander_gpu.py"
+echo "=== WhisperType setup check ==="
+echo
+echo "1. Runtime Python:"
+if [[ -n "$PYTHON" && -x "$PYTHON" ]]; then
+    "$PYTHON" --version
+    pass "$PYTHON"
+else
+    fail "Python 3.12 was not found"
+fi
+
+echo
+echo "2. Python dependencies (using the runtime above):"
+for module in sounddevice scipy numpy pyperclip pynput dotenv google.genai; do
+    if [[ -n "$PYTHON" ]] && "$PYTHON" -c "import $module" >/dev/null 2>&1; then
+        pass "$module"
     else
-        echo "⚠ Ready to run (CPU only)"
-        echo "  For GPU acceleration, run: ./Linux/setup_gpu.sh"
-        echo "  Then run: python Linux/portable_commander_gpu.py"
+        fail "$module"
+    fi
+done
+
+echo
+echo "3. NVIDIA GPU:"
+if command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi >/dev/null 2>&1; then
+    nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader
+    pass "NVIDIA GPU detected"
+else
+    fail "NVIDIA GPU / working nvidia-smi not detected"
+fi
+
+echo
+echo "4. CUDA build:"
+if [[ ! -x "$WHISPER_CLI" ]]; then
+    fail "whisper-cli not found at $WHISPER_CLI"
+else
+    pass "whisper-cli found"
+    LDD_OUTPUT="$(LD_LIBRARY_PATH="$WHISPER_LIB_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" ldd "$WHISPER_CLI" 2>&1 || true)"
+    if grep -Eq 'libggml-cuda|libcudart|libcublas' <<<"$LDD_OUTPUT"; then
+        pass "CUDA-linked whisper.cpp build detected"
+    else
+        fail "whisper-cli is not linked to the expected CUDA libraries"
+    fi
+    if grep -q 'not found' <<<"$LDD_OUTPUT"; then
+        fail "whisper-cli has unresolved shared libraries"
+        grep 'not found' <<<"$LDD_OUTPUT" | sed 's/^/     /'
+    fi
+fi
+
+echo
+echo "5. Whisper model:"
+if [[ -f "$MODEL_PATH" ]]; then
+    ACTUAL_SHA256="$(sha256sum "$MODEL_PATH" | awk '{print $1}')"
+    if [[ "$ACTUAL_SHA256" == "$EXPECTED_MODEL_SHA256" ]]; then
+        pass "ggml-medium.en.bin checksum verified"
+    else
+        fail "ggml-medium.en.bin checksum mismatch"
     fi
 else
-    echo "✗ Setup incomplete. Run: ./Linux/setup_gpu.sh"
+    fail "model not found at $MODEL_PATH"
 fi
-echo ""
+
+echo
+echo "=== Result ==="
+if (( FAILURES == 0 )); then
+    echo "✓ Ready: python3.12 Linux/voice_transcribe_gpu.py"
+    exit 0
+fi
+
+echo "✗ $FAILURES required check(s) failed. Run ./install.sh, then retry."
+exit 1

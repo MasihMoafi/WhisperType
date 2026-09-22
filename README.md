@@ -23,35 +23,16 @@ WhisperType records speech, transcribes it locally with `whisper.cpp`, and paste
 
 The current primary path is Linux with an NVIDIA GPU. Optional Gemini refinement can remove dictation noise and restructure the transcription before it is pasted.
 
-**Proof available now:** the working Linux implementation, a setup-check script, and the recorded demo below. There is **no small one-command installer or prebuilt bundle today**; setup still requires building `whisper.cpp` and downloading a model.
+**Proof available now:** the working Linux implementation, a reproducible source installer, a setup-check script, and the recorded demo below. The installer creates an isolated Python environment from [`requirements.lock`](requirements.lock), builds a pinned `whisper.cpp` revision with CUDA, downloads the expected model, verifies its checksum, and tests the resulting runtime. There is no prebuilt bundle today.
 
 ## Quick start — Linux + NVIDIA GPU
 
-Clone both repositories:
+Clone the repository and run the installer:
 
 ```bash
-git clone https://github.com/MasihMoafi/Voice-commander.git WhisperType
+git clone https://github.com/MasihMoafi/WhisperType.git
 cd WhisperType
-git clone https://github.com/ggerganov/whisper.cpp.git
-```
-
-Build `whisper.cpp` with CUDA:
-
-```bash
-cmake -S whisper.cpp -B whisper.cpp/build -DGGML_CUDA=ON -DCMAKE_BUILD_TYPE=Release
-cmake --build whisper.cpp/build --config Release -j"$(nproc)"
-```
-
-Download the model expected by the current Linux script:
-
-```bash
-bash whisper.cpp/models/download-ggml-model.sh medium.en
-```
-
-Install Python dependencies:
-
-```bash
-python -m pip install sounddevice scipy numpy pyperclip pynput python-dotenv google-genai
+./install.sh
 ```
 
 Check the local setup:
@@ -61,10 +42,10 @@ chmod +x Linux/test_setup.sh
 ./Linux/test_setup.sh
 ```
 
-Run:
+Run the same implementation used by the local `vc` workflow:
 
 ```bash
-python Linux/portable_commander_gpu.py
+./run-whisper.sh
 ```
 
 Expected result: press **F8**, **F9**, or **Right Ctrl** to start/stop recording; the transcription is copied and pasted into the active application.
@@ -178,14 +159,13 @@ Without `GEMINI_API_KEY`, the Linux implementation falls back to the local Whisp
 
 ### Planned / unresolved
 
-- Easier packaging and installation. The current dependency footprint makes a simple downloadable bundle impractical without additional packaging work.
+- A prebuilt binary/package. The source installer is reproducible, but still compiles `whisper.cpp` locally and downloads the model.
 - Broader platform acceptance testing.
 - Multi-language support.
 - Additional refinement-provider options only when there is a maintained implementation path.
 
 ### Not claimed as supported today
 
-- A one-command install.
 - A small standalone binary/package.
 - Verified macOS support.
 - Verified Windows end-to-end support.
@@ -231,7 +211,7 @@ This is an example of the refinement transformation, not a guaranteed output for
 
 ## Future development
 
-The main adoption blocker is installation, not another feature list. The next useful work is a smaller, reproducible distribution path with clean-machine verification before expanding the product surface.
+The next useful distribution step is a prebuilt package with clean-machine CI verification before expanding the product surface.
 
 ## License
 

@@ -31,6 +31,13 @@ _CLI_B = os.path.join(PARAKEET_DIR, "build", "examples", "cli", "parakeet-cli")
 PARAKEET_EXECUTABLE = _CLI_A if os.path.exists(_CLI_A) else _CLI_B
 PARAKEET_MODEL_PATH = os.path.join(PARAKEET_DIR, "models", "tdt-0.6b-v2-f16.gguf")
 
+# Library paths for CUDA / GGML
+_LIB_A = os.path.join(PARAKEET_DIR, "build", "third_party", "ggml", "src")
+_LIB_B = os.path.join(PARAKEET_DIR, "build", "third_party", "ggml", "src", "ggml-cuda")
+for _lp in [_LIB_A, _LIB_B]:
+    if os.path.exists(_lp) and _lp not in os.environ.get("LD_LIBRARY_PATH", ""):
+        os.environ["LD_LIBRARY_PATH"] = _lp + ":" + os.environ.get("LD_LIBRARY_PATH", "")
+
 HOTKEYS    = [keyboard.Key.f8, keyboard.Key.f9, keyboard.Key.ctrl_r]
 SAMPLERATE = 16000
 
@@ -115,7 +122,9 @@ def _terminal_focused() -> bool:
     return any(c in _TERMINALS for c in _get_active_wm_classes())
 
 
-def send_paste(ctrl: keyboard.Controller):
+def send_paste(ctrl: keyboard.Controller = None):
+    import time
+    time.sleep(0.05)
     mode = os.environ.get("VC_PASTE_MODE", "auto").strip().lower()
     if mode not in {"auto", "ctrl_v", "ctrl_shift_v"}:
         mode = "auto"
@@ -123,12 +132,57 @@ def send_paste(ctrl: keyboard.Controller):
         mode == "ctrl_shift_v"
         or (mode == "auto" and sys.platform.startswith("linux") and _terminal_focused())
     )
+
+    # 1. Try kernel-level uinput injection via evdev (works on Wayland and X11)
+    try:
+        from evdev import UInput, ecodes
+        cap = {ecodes.EV_KEY: [ecodes.KEY_LEFTCTRL, ecodes.KEY_LEFTSHIFT, ecodes.KEY_V]}
+        with UInput(cap, name="whispertype-virtual-keyboard") as ui:
+            ui.write(ecodes.EV_KEY, ecodes.KEY_LEFTCTRL, 1)
+            if use_shift:
+                ui.write(ecodes.EV_KEY, ecodes.KEY_LEFTSHIFT, 1)
+            ui.syn()
+            time.sleep(0.01)
+
+            ui.write(ecodes.EV_KEY, ecodes.KEY_V, 1)
+            ui.syn()
+            time.sleep(0.01)
+            ui.write(ecodes.EV_KEY, ecodes.KEY_V, 0)
+            ui.syn()
+            time.sleep(0.01)
+
+            if use_shift:
+                ui.write(ecodes.EV_KEY, ecodes.KEY_LEFTSHIFT, 0)
+            ui.write(ecodes.EV_KEY, ecodes.KEY_LEFTCTRL, 0)
+            ui.syn()
+            return
+    except Exception:
+        pass
+
+    # 2. Try ydotool if installed
+    try:
+        env = os.environ.copy()
+        uid = os.getuid()
+        for sock in [f"/run/user/{uid}/ydotoold.socket", "/tmp/.ydotool_socket"]:
+            if os.path.exists(sock):
+                env["YDOTOOL_SOCKET"] = sock
+                break
+        keys = ["29:1", "42:1", "47:1", "47:0", "42:0", "29:0"] if use_shift else ["29:1", "47:1", "47:0", "29:0"]
+        if subprocess.run(["ydotool", "key"] + keys, capture_output=True, env=env).returncode == 0:
+            return
+    except Exception:
+        pass
+
+    # 3. Fallback to pynput
+    if ctrl is None:
+        ctrl = keyboard.Controller()
     if use_shift:
         with ctrl.pressed(keyboard.Key.ctrl, keyboard.Key.shift):
             ctrl.press("v"); ctrl.release("v")
     else:
         with ctrl.pressed(keyboard.Key.ctrl):
             ctrl.press("v"); ctrl.release("v")
+
 
 
 # ── RECORDER ──────────────────────────────────────────────────────────────────
@@ -163,7 +217,7 @@ class Recorder:
         self._process()
 
     def _record_loop(self):
-        with sd.InputStream(samplerate=SAMPLERATE, channels=1, dtype="int16") as s:
+        with sd.InputStream(samplerate=SAMPLERATE, channels=1, dtype="int16", device=None) as s:
             while self.recording:
                 chunk, _ = s.read(1600)  # 100 ms
                 with self.lock:
@@ -254,13 +308,37 @@ class Recorder:
 # ── WIRING ────────────────────────────────────────────────────────────────────
 
 recorder = Recorder()
+_last_toggle_time = 0
+_toggle_lock = threading.Lock()
 
-def on_press(key):
-    if key in HOTKEYS:
+
+def toggle_recording():
+    global _last_toggle_time
+    import time
+    with _toggle_lock:
+        now = time.time()
+        if now - _last_toggle_time < 0.3:
+            return
+        _last_toggle_time = now
         if recorder.recording:
             recorder.stop_and_process()
         else:
             recorder.start()
+
+
+def is_hotkey(key):
+    """Accept only explicitly configured pynput keys.
+
+    Avoid raw numeric virtual-key fallbacks: on Linux, mouse/media devices
+    can expose keyboard-like key codes and accidentally trigger recording.
+    """
+    return key in HOTKEYS
+
+
+def on_press(key):
+    if is_hotkey(key):
+        toggle_recording()
+
 
 def main():
     if not verify_setup():
@@ -278,6 +356,7 @@ def main():
 
     with keyboard.Listener(on_press=on_press) as listener:
         listener.join()
+
 
 if __name__ == "__main__":
     main()
