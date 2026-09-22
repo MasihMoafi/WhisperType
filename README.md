@@ -23,7 +23,7 @@ WhisperType records speech, transcribes it locally with `whisper.cpp`, and paste
 
 The current primary path is Linux with an NVIDIA GPU. Optional Gemini refinement can remove dictation noise and restructure the transcription before it is pasted.
 
-**Proof available now:** the working Linux implementation, a reproducible source installer, a setup-check script, and the recorded demo below. The installer creates an isolated Python environment from [`requirements.lock`](requirements.lock), builds a pinned `whisper.cpp` revision with CUDA, downloads the expected model, verifies its checksum, and tests the resulting runtime. There is no prebuilt bundle today.
+**Proof available now:** the working Linux implementation, a reproducible source installer, a setup-check script, and the recorded demo below. The installer creates an isolated Python environment from [`requirements.lock`](requirements.lock), builds a pinned `whisper.cpp` revision with CUDA, downloads the expected model, verifies its checksum, tests the resulting runtime, and installs the `whispertype`/`vc` commands plus an Applications-menu launcher. There is no prebuilt bundle today.
 
 ## Quick start — Linux + NVIDIA GPU
 
@@ -42,11 +42,15 @@ chmod +x Linux/test_setup.sh
 ./Linux/test_setup.sh
 ```
 
-Run the same implementation used by the local `vc` workflow:
+Start it from the Applications menu, or run either command:
 
 ```bash
-./run-whisper.sh
+whispertype
+# Short form:
+vc
 ```
+
+If `~/.local/bin` is not yet on your shell path, reopen the terminal or run `./run-whisper.sh` directly.
 
 Expected result: press **F8**, **F9**, or **Right Ctrl** to start/stop recording; the transcription is copied and pasted into the active application.
 
