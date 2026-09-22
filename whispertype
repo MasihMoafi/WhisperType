@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+ROOT="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+
+usage() {
+    cat <<'EOF'
+Usage: whispertype [command]
+
+Commands:
+  start              Start WhisperType (default)
+  check              Verify the local GPU setup
+  install-launcher   Install the vc command and Applications-menu launcher
+  help               Show this help
+EOF
+}
+
+case "${1:-start}" in
+    start)
+        (( $# == 0 )) || shift
+        exec "$ROOT/run-whisper.sh" "$@"
+        ;;
+    check)
+        shift
+        exec "$ROOT/Linux/test_setup.sh" "$@"
+        ;;
+    install-launcher)
+        shift
+        exec "$ROOT/install-launcher.sh" "$@"
+        ;;
+    help|-h|--help)
+        usage
+        ;;
+    *)
+        printf 'Unknown command: %s\n\n' "$1" >&2
+        usage >&2
+        exit 2
+        ;;
+esac

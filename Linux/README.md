@@ -5,8 +5,11 @@ GPU-accelerated voice transcription with CUDA support.
 ## Run
 
 ```bash
-./run-whisper.sh
+whispertype
+# Or: vc
 ```
+
+You can also open **WhisperType** from the desktop Applications menu.
 
 ## Usage
 - **F8/F9** - Start/stop recording

@@ -51,5 +51,6 @@ fi
 echo "$MODEL_SHA256  $MODEL" | sha256sum --check --status || die "model checksum mismatch"
 
 WHISPERTYPE_PYTHON="$ROOT/.venv/bin/python" "$ROOT/Linux/test_setup.sh"
+"$ROOT/install-launcher.sh"
 echo
-echo "Installation verified. Run: $ROOT/run-whisper.sh"
+echo "Installation verified. Run: whispertype (or vc), or open WhisperType from Applications."

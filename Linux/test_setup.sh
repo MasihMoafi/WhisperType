@@ -16,7 +16,6 @@ FAILURES=0
 
 pass() { printf '   ✓ %s\n' "$1"; }
 fail() { printf '   ✗ %s\n' "$1"; FAILURES=$((FAILURES + 1)); }
-warn() { printf '   ⚠ %s\n' "$1"; }
 
 if [[ -n "${WHISPERTYPE_PYTHON:-}" ]]; then
     PYTHON="$WHISPERTYPE_PYTHON"
@@ -91,7 +90,7 @@ fi
 echo
 echo "=== Result ==="
 if (( FAILURES == 0 )); then
-    echo "✓ Ready: python3.12 Linux/voice_transcribe_gpu.py"
+    echo "✓ Runtime ready: $BASE_DIR/run-whisper.sh"
     exit 0
 fi
 
