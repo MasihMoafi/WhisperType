@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""MCP Server for Voice-Commander (Whisper.cpp audio transcription and status)."""
+"""MCP Server for WhisperType (Whisper.cpp audio transcription and status)."""
 
 import os
 import sys
@@ -30,7 +30,7 @@ except ImportError:
 from mcp.server.fastmcp import FastMCP
 
 # Initialize FastMCP Server
-mcp = FastMCP("Voice-Commander")
+mcp = FastMCP("WhisperType")
 
 # Paths and configurations
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -193,7 +193,7 @@ def voice_status() -> str:
     """Checks microphone status, Whisper.cpp binary availability, models readiness, and GPU support.
 
     Returns:
-        JSON string containing comprehensive status of the Voice-Commander system.
+        JSON string containing comprehensive status of the WhisperType system.
     """
     executable = get_whisper_executable()
     models = get_available_models()
