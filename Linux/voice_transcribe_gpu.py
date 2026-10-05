@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Voice transcription with GPU acceleration - no external API required."""
+"""Voice transcription: local GPU whisper.cpp, or OpenRouter cloud Whisper."""
 
 import os
 import subprocess
@@ -12,6 +12,9 @@ import numpy as np
 import pyperclip
 from pynput import keyboard
 import sys
+import time
+import base64
+import requests
 
 # --- CONFIGURATION ---
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -37,6 +40,10 @@ for lib_dir in ["bin", "src", "ggml/src", "ggml/src/ggml-cuda"]:
     path = os.path.join(WHISPER_BUILD_DIR, lib_dir)
     if os.path.exists(path):
         os.environ['LD_LIBRARY_PATH'] = path + ":" + os.environ.get('LD_LIBRARY_PATH', '')
+
+BACKEND = os.environ.get("WHISPERTYPE_BACKEND", "local").strip().lower()
+CLOUD_MODEL = os.environ.get("WHISPERTYPE_CLOUD_MODEL", "openai/whisper-large-v3-turbo")
+LANGUAGE = "en"
 
 HOTKEYS = [keyboard.Key.f8, keyboard.Key.f9, keyboard.Key.ctrl_r]
 SAMPLERATE = 16000
@@ -125,6 +132,37 @@ def send_paste(controller: keyboard.Controller = None):
 
 
 
+def transcribe_local(wav_path):
+    env = os.environ.copy()
+    env['CUDA_VISIBLE_DEVICES'] = '0'
+    result = subprocess.run(
+        [WHISPER_EXECUTABLE, "-m", WHISPER_MODEL_PATH, "-f", wav_path, "-nt", "-l", LANGUAGE],
+        capture_output=True, text=True, env=env
+    )
+    text = result.stdout.strip()
+    if not text and result.stderr:
+        print(f"Error: {result.stderr}")
+    return text
+
+
+def transcribe_cloud(wav_path):
+    with open(wav_path, "rb") as f:
+        audio = base64.b64encode(f.read()).decode()
+    try:
+        response = requests.post(
+            "https://openrouter.ai/api/v1/audio/transcriptions",
+            headers={"Authorization": f"Bearer {os.environ['OPENROUTER_API_KEY']}"},
+            json={"model": CLOUD_MODEL, "language": LANGUAGE,
+                  "input_audio": {"data": audio, "format": "wav"}},
+            timeout=60,
+        )
+        response.raise_for_status()
+    except Exception as error:
+        print(f"Error: OpenRouter request failed: {error}")
+        return ""
+    return response.json().get("text", "").strip()
+
+
 class Recorder:
     def __init__(self):
         self.recording = False
@@ -174,21 +212,14 @@ class Recorder:
         wav_path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4()}.wav")
         write_wav(wav_path, SAMPLERATE, audio)
 
-        env = os.environ.copy()
-        env['CUDA_VISIBLE_DEVICES'] = '0'
-        
-        result = subprocess.run(
-            [WHISPER_EXECUTABLE, "-m", WHISPER_MODEL_PATH, "-f", wav_path, "-nt"],
-            capture_output=True, text=True, env=env
-        )
-        os.remove(wav_path)
-
-        text = result.stdout.strip()
+        started = time.time()
+        try:
+            text = transcribe_cloud(wav_path) if BACKEND == "openrouter" else transcribe_local(wav_path)
+        finally:
+            os.remove(wav_path)
         if not text:
-            if result.stderr:
-                print(f"Error: {result.stderr}")
             return
-
+        print(f"[{BACKEND} {time.time() - started:.2f}s]")
         print(f"Transcribed: {text}")
         pyperclip.copy(text)
         
@@ -231,11 +262,15 @@ def on_press(key):
 
 
 def main():
-    if not verify_gpu():
+    if BACKEND == "openrouter":
+        if not os.environ.get("OPENROUTER_API_KEY"):
+            print("ERROR: OPENROUTER_API_KEY is not set.")
+            sys.exit(1)
+    elif not verify_gpu():
         print("ERROR: GPU not available. Ensure NVIDIA drivers and CUDA are installed.")
         sys.exit(1)
 
-    print("Voice Transcribe (GPU) - Ready")
+    print(f"Voice Transcribe ({CLOUD_MODEL if BACKEND == 'openrouter' else 'local GPU'}) - Ready")
     print("  F8/F9/Right Ctrl: Start/Stop recording")
     print("  Transcribed text auto-pastes at cursor")
     print("  Ctrl+C to exit")

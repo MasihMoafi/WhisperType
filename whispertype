@@ -9,7 +9,8 @@ usage() {
 Usage: whispertype [command]
 
 Commands:
-  start              Start WhisperType (default)
+  start              Start WhisperType on the local GPU (default)
+  cloud              Start WhisperType with OpenRouter Whisper (needs OPENROUTER_API_KEY)
   check              Verify the local GPU setup
   install-launcher   Install the vc command and Applications-menu launcher
   help               Show this help
@@ -20,6 +21,10 @@ case "${1:-start}" in
     start)
         (( $# == 0 )) || shift
         exec "$ROOT/run-whisper.sh" "$@"
+        ;;
+    cloud)
+        shift
+        WHISPERTYPE_BACKEND=openrouter exec "$ROOT/run-whisper.sh" "$@"
         ;;
     check)
         shift
