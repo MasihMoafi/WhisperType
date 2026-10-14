@@ -17,4 +17,8 @@ else
     WHISPER_LIB_DIR="$ROOT/whisper.cpp/build/bin"
 fi
 export LD_LIBRARY_PATH="$WHISPER_LIB_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-exec "$PYTHON" "$ROOT/Linux/voice_transcribe_gpu.py" "$@"
+if [[ "${1:-}" == "parakeet" ]]; then
+    shift
+    exec "$PYTHON" -u "$ROOT/parakeet-commander/portable_commander_parakeet.py" "$@"
+fi
+exec "$PYTHON" -u "$ROOT/Linux/voice_transcribe_gpu.py" "$@"

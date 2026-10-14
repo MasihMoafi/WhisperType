@@ -1,4 +1,4 @@
-# Voice Commander - Linux Edition
+# WhisperType - Linux Edition
 
 GPU-accelerated voice transcription with CUDA support.
 

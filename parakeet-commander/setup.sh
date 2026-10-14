@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup.sh — Bootstrap parakeet.cpp (CUDA-only) for Voice-Commander
+# setup.sh — Bootstrap parakeet.cpp (CUDA-only) for WhisperType
 # Run from the repo root: bash parakeet-commander/setup.sh
 set -euo pipefail
 
@@ -10,7 +10,7 @@ MODEL_DIR="$PARAKEET_DIR/models"
 MODEL_FILE="$MODEL_DIR/tdt-0.6b-v2-f16.gguf"
 HF_MODEL_URL="https://huggingface.co/mudler/parakeet-cpp-gguf/resolve/main/tdt-0.6b-v2-f16.gguf"
 
-echo "=== parakeet.cpp setup (CUDA) for Voice-Commander ==="
+echo "=== parakeet.cpp setup (CUDA) for WhisperType ==="
 
 # Require CUDA
 if ! command -v nvidia-smi &>/dev/null || ! nvidia-smi &>/dev/null 2>&1; then

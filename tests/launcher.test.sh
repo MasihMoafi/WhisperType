@@ -25,4 +25,21 @@ fi
 "$HOME/.local/bin/vc" install-launcher
 test "$(readlink "$HOME/.local/bin/vc")" = "$ROOT/whispertype"
 
+# One engine at a time: a second start must refuse while the first holds the lock.
+export XDG_RUNTIME_DIR="$TEST_ROOT/run" WHISPERTYPE_ENGINE="sleep 30"
+mkdir -p "$XDG_RUNTIME_DIR"
+"$HOME/.local/bin/whispertype" status | grep -Fq "stopped"
+"$HOME/.local/bin/whispertype" start --background >/dev/null
+"$HOME/.local/bin/whispertype" status | grep -Fq "running"
+"$HOME/.local/bin/whispertype" status --json | jq -e '.running == true and (.pid | type) == "number"' >/dev/null
+if "$HOME/.local/bin/whispertype" start >/dev/null 2>&1; then
+    echo "second engine must be refused" >&2
+    exit 1
+fi
+"$HOME/.local/bin/whispertype" stop >/dev/null
+"$HOME/.local/bin/whispertype" status --json | jq -e '.running == false' >/dev/null
+
+# The menu maps a choice to a command; 8 quits without starting anything.
+printf '8\n' | "$HOME/.local/bin/whispertype" menu 2>&1 | grep -Fq "OpenRouter"
+
 echo "launcher contract passed"

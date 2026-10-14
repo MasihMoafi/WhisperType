@@ -3,42 +3,167 @@ set -euo pipefail
 
 SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
 ROOT="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+STATE_DIR="${XDG_RUNTIME_DIR:-/tmp/$(id -u)}/whispertype"
+export WHISPERTYPE_STATE_DIR="$STATE_DIR"
 
 usage() {
     cat <<'EOF'
 Usage: whispertype [command]
 
 Commands:
-  start              Start WhisperType on the local GPU (default)
-  cloud              Start WhisperType with OpenRouter Whisper (needs OPENROUTER_API_KEY)
+  menu               Choose what to run (default in a terminal)
+  start              Dictate with the default backend (default for vc, vc1, vc2)
+  cloud              Dictate with OpenRouter (needs OPENROUTER_API_KEY_COMPANY)
+  local              Dictate with local GPU Whisper
+  parakeet           Dictate with the local Parakeet GPU engine
+  status [--json]    Show whether dictation is running, and with which model
+  stop               Stop the running dictation engine
+  transcribe FILE|-  Transcribe one audio file (or stdin) with OpenRouter and print JSON
   check              Verify the local GPU setup
   install-launcher   Install the vc command and Applications-menu launcher
   help               Show this help
+
+Add --background to start, cloud, local or parakeet to run detached;
+output goes to the log shown by status.
+
+Environment:
+  WHISPERTYPE_BACKEND      Backend for start: openrouter (default) or local
+  WHISPERTYPE_CLOUD_MODEL  OpenRouter model (vc/vc1: openai/gpt-4o-mini-transcribe,
+                           vc2: nvidia/parakeet-tdt-0.6b-v3)
 EOF
 }
 
-case "${1:-start}" in
+python_bin() {
+    if [[ -x "$ROOT/.venv/bin/python" ]]; then echo "$ROOT/.venv/bin/python"; else command -v python3; fi
+}
+
+running_pid() {
+    [[ -e "$STATE_DIR/lock" ]] || return 1
+    flock -n "$STATE_DIR/lock" true && return 1
+    cat "$STATE_DIR/pid"
+}
+
+# Holds a lock for the engine's lifetime, so two engines never paste the same speech twice.
+run_engine() {
+    if [[ "${1:-}" == "--background" ]]; then
+        shift
+        mkdir -p "$STATE_DIR"
+        setsid -f "$SCRIPT_PATH" "$ENGINE_COMMAND" "$@" >"$STATE_DIR/log" 2>&1 </dev/null
+        for _ in {1..50}; do running_pid >/dev/null && break; sleep 0.1; done
+        status
+        return
+    fi
+    mkdir -p "$STATE_DIR"
+    exec 9>"$STATE_DIR/lock"
+    if ! flock -n 9; then
+        printf 'WhisperType is already running (pid %s). Stop it with: whispertype stop\n' "$(cat "$STATE_DIR/pid")" >&2
+        exit 3
+    fi
+    echo "$$" >"$STATE_DIR/pid"
+    rm -f "$STATE_DIR/engine.json"
+    if [[ -n "${WHISPERTYPE_ENGINE:-}" ]]; then exec ${WHISPERTYPE_ENGINE}; fi  # test seam
+    exec "$ROOT/run-whisper.sh" "$@"
+}
+
+status() {
+    local pid="" engine="{}" log=""
+    pid="$(running_pid)" || pid=""
+    [[ -z "$pid" || ! -s "$STATE_DIR/engine.json" ]] || engine="$(cat "$STATE_DIR/engine.json")"
+    [[ ! -e "$STATE_DIR/log" ]] || log="$STATE_DIR/log"
+    if [[ "${1:-}" == "--json" ]]; then
+        jq -n --arg pid "$pid" --argjson engine "$engine" --arg log "$log" \
+            '{running: ($pid != ""), pid: ($pid | tonumber? // null), backend: $engine.backend, model: $engine.model, log: (if $log == "" then null else $log end)}'
+    elif [[ -n "$pid" ]]; then
+        printf 'running (pid %s) · %s\n' "$pid" "$(jq -r '[.backend, .model] | map(select(. != null)) | join(" · ")' <<<"$engine")"
+    else
+        echo "stopped"
+    fi
+}
+
+stop() {
+    local pid
+    pid="$(running_pid)" || { echo "stopped"; return; }
+    kill -TERM "$pid"
+    for _ in {1..30}; do running_pid >/dev/null || { echo "stopped"; return; }; sleep 0.1; done
+    kill -KILL "$pid"
+    echo "stopped"
+}
+
+menu() {
+    local choices=(
+        "Dictate · OpenRouter GPT-4o mini (vc)"
+        "Dictate · OpenRouter Parakeet (vc2)"
+        "Dictate · local GPU Whisper"
+        "Dictate · local GPU Parakeet"
+        "Status"
+        "Stop dictation"
+        "Check local GPU setup"
+        "Quit"
+    )
+    echo "WhisperType · $(status)"
+    PS3="Choose 1-${#choices[@]}: "
+    select _ in "${choices[@]}"; do
+        case "$REPLY" in
+            1) WHISPERTYPE_CLOUD_MODEL=openai/gpt-4o-mini-transcribe exec "$SCRIPT_PATH" cloud ;;
+            2) WHISPERTYPE_CLOUD_MODEL=nvidia/parakeet-tdt-0.6b-v3 exec "$SCRIPT_PATH" cloud ;;
+            3) exec "$SCRIPT_PATH" local ;;
+            4) exec "$SCRIPT_PATH" parakeet ;;
+            5) status ;;
+            6) stop ;;
+            7) exec "$SCRIPT_PATH" check ;;
+            8) return ;;
+            *) echo "Choose a number from the list." ;;
+        esac
+    done
+}
+
+DEFAULT_COMMAND=start
+[[ -t 0 && "$(basename "${BASH_SOURCE[0]}")" == "whispertype" ]] && DEFAULT_COMMAND=menu
+# vc2 keeps its Parakeet identity, served by OpenRouter (fastest measured model).
+[[ "$(basename "${BASH_SOURCE[0]}")" != "vc2" ]] || export WHISPERTYPE_CLOUD_MODEL="${WHISPERTYPE_CLOUD_MODEL:-nvidia/parakeet-tdt-0.6b-v3}"
+
+COMMAND="${1:-$DEFAULT_COMMAND}"
+(( $# == 0 )) || shift
+ENGINE_COMMAND="$COMMAND"
+case "$COMMAND" in
     start)
-        (( $# == 0 )) || shift
-        exec "$ROOT/run-whisper.sh" "$@"
+        run_engine "$@"
         ;;
     cloud)
-        shift
-        WHISPERTYPE_BACKEND=openrouter exec "$ROOT/run-whisper.sh" "$@"
+        export WHISPERTYPE_BACKEND=openrouter
+        run_engine "$@"
+        ;;
+    local)
+        export WHISPERTYPE_BACKEND=local
+        run_engine "$@"
+        ;;
+    parakeet)
+        if [[ "${1:-}" == "--background" ]]; then run_engine "$@"; else run_engine parakeet "$@"; fi
+        ;;
+    status)
+        status "$@"
+        ;;
+    stop)
+        stop
+        ;;
+    menu)
+        menu
+        ;;
+    transcribe)
+        (( $# == 1 )) || { echo "usage: whispertype transcribe FILE" >&2; exit 2; }
+        exec "$(python_bin)" -u "$ROOT/Linux/cloud_transcribe.py" "$1"
         ;;
     check)
-        shift
         exec "$ROOT/Linux/test_setup.sh" "$@"
         ;;
     install-launcher)
-        shift
         exec "$ROOT/install-launcher.sh" "$@"
         ;;
     help|-h|--help)
         usage
         ;;
     *)
-        printf 'Unknown command: %s\n\n' "$1" >&2
+        printf 'Unknown command: %s\n\n' "$COMMAND" >&2
         usage >&2
         exit 2
         ;;

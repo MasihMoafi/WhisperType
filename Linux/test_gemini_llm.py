@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test Gemini LLM integration for voice commander"""
+"""Test Gemini LLM integration for WhisperType"""
 
 import os
 from dotenv import load_dotenv

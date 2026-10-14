@@ -16,7 +16,7 @@ from pynput import keyboard
 # │   ├── ... (whisper.cpp contents)
 # │   └── models/
 # │       └── ggml-medium.en.bin
-# └── VoiceCommander/
+# └── WhisperType/
 #     └── portable_commander.py
 
 # Get the directory of the current script
@@ -189,7 +189,7 @@ def on_press(key):
             recorder.start()
 
 def main():
-    print(f"VoiceCommander (GPU) is active. Press F8 or F9 to start/stop recording.")
+    print(f"WhisperType (GPU) is active. Press F8 or F9 to start/stop recording.")
     print("The transcribed text will be pasted at your cursor's location.")
     print("Close this window or press Ctrl+C to exit.")
     

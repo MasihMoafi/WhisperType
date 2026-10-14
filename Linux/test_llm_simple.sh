@@ -1,7 +1,7 @@
 #!/bin/bash
 # Simple test for LLM integration
 
-echo "=== Voice Commander LLM Integration Test ==="
+echo "=== WhisperType LLM Integration Test ==="
 echo ""
 
 # Check if Ollama is running
@@ -51,4 +51,4 @@ fi
 
 echo ""
 echo "=== ALL TESTS PASSED ==="
-echo "Your Voice Commander is ready with LLM post-processing!"
+echo "Your WhisperType is ready with LLM post-processing!"

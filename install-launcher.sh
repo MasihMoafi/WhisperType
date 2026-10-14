@@ -22,6 +22,8 @@ install_link() {
 mkdir -p "$BIN_DIR" "$APPLICATIONS_DIR"
 install_link "$ROOT/whispertype" "$BIN_DIR/whispertype"
 install_link "$ROOT/whispertype" "$BIN_DIR/vc"
+install_link "$ROOT/whispertype" "$BIN_DIR/vc1"
+install_link "$ROOT/whispertype" "$BIN_DIR/vc2"
 
 if [[ -e "$DESKTOP_FILE" ]] && ! grep -Fq 'X-WhisperType-Managed=true' "$DESKTOP_FILE"; then
     die "refusing to replace unmanaged launcher: $DESKTOP_FILE"
@@ -33,7 +35,7 @@ cat >"$TEMP_DESKTOP" <<EOF
 [Desktop Entry]
 Type=Application
 Name=WhisperType
-Comment=Private GPU dictation at your cursor
+Comment=Dictation at your cursor
 Exec="$BIN_DIR/whispertype" start
 Icon=audio-input-microphone
 Terminal=true
@@ -46,5 +48,5 @@ chmod 0644 "$TEMP_DESKTOP"
 mv "$TEMP_DESKTOP" "$DESKTOP_FILE"
 trap - EXIT
 
-printf 'Installed commands: %s and %s\n' "$BIN_DIR/whispertype" "$BIN_DIR/vc"
+printf 'Installed commands: %s, vc, vc1 and vc2\n' "$BIN_DIR/whispertype"
 printf 'Installed application launcher: %s\n' "$DESKTOP_FILE"

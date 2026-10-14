@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Manual test for LLM refinement - tests the exact function used in Voice Commander
+Manual test for LLM refinement - tests the exact function used in WhisperType
 """
 
 import sys
@@ -62,7 +62,7 @@ if __name__ == "__main__":
     sys.stdout.flush()  # Force immediate output
 
     print("=" * 70)
-    print("Voice Commander LLM Refinement Test")
+    print("WhisperType LLM Refinement Test")
     print("=" * 70)
     sys.stdout.flush()
 
