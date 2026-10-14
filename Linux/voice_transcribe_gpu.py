@@ -11,10 +11,10 @@ from scipy.io.wavfile import write as write_wav
 import numpy as np
 import pyperclip
 from pynput import keyboard
+from desktop_input import listen_for_hotkeys, send_wayland_paste, write_engine_state
+import cloud_transcribe as cloud
 import sys
 import time
-import base64
-import requests
 
 # --- CONFIGURATION ---
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -41,9 +41,8 @@ for lib_dir in ["bin", "src", "ggml/src", "ggml/src/ggml-cuda"]:
     if os.path.exists(path):
         os.environ['LD_LIBRARY_PATH'] = path + ":" + os.environ.get('LD_LIBRARY_PATH', '')
 
-BACKEND = os.environ.get("WHISPERTYPE_BACKEND", "local").strip().lower()
-CLOUD_MODEL = os.environ.get("WHISPERTYPE_CLOUD_MODEL", "openai/whisper-large-v3-turbo")
-LANGUAGE = "en"
+BACKEND = os.environ.get("WHISPERTYPE_BACKEND", "openrouter").strip().lower()
+LANGUAGE = cloud.LANGUAGE
 
 HOTKEYS = [keyboard.Key.f8, keyboard.Key.f9, keyboard.Key.ctrl_r]
 SAMPLERATE = 16000
@@ -77,6 +76,9 @@ def send_paste(controller: keyboard.Controller = None):
                     use_shift = True
         except Exception:
             pass
+
+    if send_wayland_paste(use_shift):
+        return
 
     # 1. Try kernel-level uinput injection via evdev (works on Wayland and X11)
     try:
@@ -146,21 +148,11 @@ def transcribe_local(wav_path):
 
 
 def transcribe_cloud(wav_path):
-    with open(wav_path, "rb") as f:
-        audio = base64.b64encode(f.read()).decode()
     try:
-        response = requests.post(
-            "https://openrouter.ai/api/v1/audio/transcriptions",
-            headers={"Authorization": f"Bearer {os.environ['OPENROUTER_API_KEY']}"},
-            json={"model": CLOUD_MODEL, "language": LANGUAGE,
-                  "input_audio": {"data": audio, "format": "wav"}},
-            timeout=60,
-        )
-        response.raise_for_status()
+        return cloud.transcribe(wav_path)
     except Exception as error:
         print(f"Error: OpenRouter request failed: {error}")
         return ""
-    return response.json().get("text", "").strip()
 
 
 class Recorder:
@@ -176,6 +168,8 @@ class Recorder:
             print(">>> Recording... Press F8/F9/Right Ctrl to stop.")
             self.recording = True
             self.audio_data = []
+            if BACKEND == "openrouter":
+                threading.Thread(target=cloud.warm, daemon=True).start()
             self.record_thread = threading.Thread(target=self._record, daemon=True)
             self.record_thread.start()
 
@@ -263,20 +257,21 @@ def on_press(key):
 
 def main():
     if BACKEND == "openrouter":
-        if not os.environ.get("OPENROUTER_API_KEY"):
-            print("ERROR: OPENROUTER_API_KEY is not set.")
+        if not os.environ.get("OPENROUTER_API_KEY_COMPANY"):
+            print("ERROR: OPENROUTER_API_KEY_COMPANY is not set. Use 'whispertype local' for the GPU engine.")
             sys.exit(1)
     elif not verify_gpu():
         print("ERROR: GPU not available. Ensure NVIDIA drivers and CUDA are installed.")
         sys.exit(1)
 
-    print(f"Voice Transcribe ({CLOUD_MODEL if BACKEND == 'openrouter' else 'local GPU'}) - Ready")
+    model = cloud.MODEL if BACKEND == "openrouter" else "whisper medium.en"
+    write_engine_state(BACKEND, model)
+    print(f"Voice Transcribe ({model}) - Ready")
     print("  F8/F9/Right Ctrl: Start/Stop recording")
     print("  Transcribed text auto-pastes at cursor")
     print("  Ctrl+C to exit")
 
-    with keyboard.Listener(on_press=on_press) as listener:
-        listener.join()
+    listen_for_hotkeys(on_press)
 
 
 if __name__ == "__main__":

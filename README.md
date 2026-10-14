@@ -1,17 +1,17 @@
 <div align="center">
 
-<img src="vc-elpis.png" alt="WhisperType" width="760">
+<img src="whispertype-elpis.png" alt="WhisperType" width="760">
 
 <br>
 
-**Local voice input for developers: speak, transcribe locally, and paste at the cursor.**
+**Voice input for developers: speak, transcribe in about a second, and paste at the cursor.**
 
 [![Linux](https://img.shields.io/badge/Linux-NVIDIA%20GPU-2ea44f?style=flat-square)](#quick-start--linux--nvidia-gpu)
-[![Transcription](https://img.shields.io/badge/transcription-whisper.cpp-blue?style=flat-square)](#how-it-works)
+[![Transcription](https://img.shields.io/badge/transcription-OpenRouter%20%7C%20whisper.cpp-blue?style=flat-square)](#how-it-works)
 [![Refinement](https://img.shields.io/badge/Gemini-optional-blueviolet?style=flat-square)](#configuration)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 
-[Install](#quick-start--linux--nvidia-gpu) • [Demo](#demo) • [How it works](#how-it-works) • [Status](#current-state)
+[Install](#quick-start--linux--nvidia-gpu) • [How it works](#how-it-works) • [Status](#current-state)
 
 </div>
 
@@ -19,21 +19,35 @@
 
 > *Speak instead of typing.*
 
-WhisperType records speech, transcribes it locally with `whisper.cpp`, and pastes the result at the active cursor. The CLI alias remains **`vc`**.
+WhisperType records speech, transcribes it, and pastes the result at the active cursor. By default it transcribes through OpenRouter; `whisper.cpp` and Parakeet run locally on an NVIDIA GPU when the audio must stay on the machine. The CLI alias remains **`vc`**.
 
-The current primary path is Linux with an NVIDIA GPU. Optional Gemini refinement can remove dictation noise and restructure the transcription before it is pasted.
+It runs on Linux. Optional Gemini refinement can remove dictation noise. It can restructure the transcription before WhisperType pastes it.
 
-**Proof available now:** the working Linux implementation, a reproducible source installer, a setup-check script, and the recorded demo below. The installer creates an isolated Python environment from [`requirements.lock`](requirements.lock), builds a pinned `whisper.cpp` revision with CUDA, downloads the expected model, verifies its checksum, tests the resulting runtime, and installs the `whispertype`/`vc` commands plus an Applications-menu launcher. There is no prebuilt bundle today.
+**Proof available now:** the working Linux implementation, a reproducible source installer and a setup-check script.
+
+The installer creates an isolated Python environment from [`requirements.lock`](requirements.lock). It builds a pinned `whisper.cpp` revision with CUDA. It downloads the expected model. It checks the model checksum. It tests the resulting runtime.
+
+The installer also installs the `whispertype` and `vc` commands. It adds a launcher to the Applications menu. There is no prebuilt bundle today.
 
 ## Quick start — Linux + NVIDIA GPU
 
-Clone the repository and run the installer:
+1. Clone the repository:
 
-```bash
-git clone https://github.com/MasihMoafi/WhisperType.git
-cd WhisperType
-./install.sh
-```
+   ```bash
+   git clone https://github.com/MasihMoafi/WhisperType.git
+   ```
+
+2. Enter the repository directory:
+
+   ```bash
+   cd WhisperType
+   ```
+
+3. Run the installer:
+
+   ```bash
+   ./install.sh
+   ```
 
 Check the local setup:
 
@@ -50,13 +64,19 @@ whispertype
 vc
 ```
 
-If `~/.local/bin` is not yet on your shell path, reopen the terminal or run `./run-whisper.sh` directly.
+The default backend is OpenRouter: the recorded audio is sent there for transcription. It needs `OPENROUTER_API_KEY_COMPANY`. `vc` and `vc1` use `openai/gpt-4o-mini-transcribe`; `vc2` uses `nvidia/parakeet-tdt-0.6b-v3`. On an 11-second clip the median time to text was 0.85 s and 1.25 s respectively (14 Oct 2026, one connection). Set `WHISPERTYPE_CLOUD_MODEL` to choose another model. Run `whispertype local` or `whispertype parakeet` for the local GPU engines, or set `WHISPERTYPE_BACKEND=local`.
 
-Expected result: press **F8**, **F9**, or **Right Ctrl** to start/stop recording; the transcription is copied and pasted into the active application.
+Run `whispertype` alone for a menu. `whispertype status`, `whispertype stop` and `whispertype start --background` control one shared engine; a second engine is refused, so speech is never pasted twice. The Elpis desktop app's WhisperType section uses these same commands.
+
+If your shell path excludes `~/.local/bin`, open a new terminal. You can also start `./run-whisper.sh` directly.
+
+Press **F8**, **F9**, or **Right Ctrl** to start or stop recording.
+
+Expected result: WhisperType copies the transcription. It pastes the transcription into the active application.
 
 ## Ultra-Fast Engine: Parakeet 0.6B (`vc2`)
 
-For sub-second, ultra-fast local transcription on NVIDIA GPUs, Voice Commander supports **parakeet.cpp** running the NVIDIA Parakeet TDT 0.6B model (`vc2`).
+For sub-second, ultra-fast local transcription on NVIDIA GPUs, WhisperType supports **parakeet.cpp** running the NVIDIA Parakeet TDT 0.6B model (`vc2`).
 
 ### Quick Setup (`vc2`)
 
@@ -80,12 +100,6 @@ To run the live benchmark suite locally:
 python parakeet-commander/benchmark.py
 ```
 
-## Demo
-
-[demo.mp4](demo.mp4)
-
-The demo is evidence of the recorded workflow, not a benchmark of transcription accuracy or latency across hardware.
-
 ## The problem
 
 For long prompts, notes, and terminal instructions, typing can become the slowest part of getting an idea into an agent or editor. General dictation tools also tend to preserve filler words and transcription artifacts that are inconvenient in technical prompts.
@@ -99,7 +113,7 @@ microphone
    ↓
 16 kHz audio capture
    ↓
-whisper.cpp / medium.en
+OpenRouter (default)  or  whisper.cpp / Parakeet on the local GPU
    ↓
 raw transcription
    ↓
@@ -112,11 +126,11 @@ active terminal/editor
 
 The current Linux implementation:
 
-- records microphone audio with `sounddevice`;
-- invokes the locally built `whisper-cli` executable;
-- requires an NVIDIA GPU in the primary Linux path rather than silently falling back to CPU;
-- optionally sends the **transcribed text**, not the audio, to Gemini when refinement is enabled;
-- pastes with `Ctrl+V` or `Ctrl+Shift+V` depending on the focused application and `VC_PASTE_MODE`.
+- It records microphone audio with `sounddevice`.
+- By default it uploads the audio as FLAC to OpenRouter over a pre-warmed connection.
+- The local engines invoke the locally built `whisper-cli` or `parakeet.cpp`. They require an NVIDIA GPU and do not silently use the CPU as a fallback.
+- It can send the **transcribed text** to Gemini when you enable refinement.
+- It pastes with `Ctrl+V` or `Ctrl+Shift+V`. The focused application and `VC_PASTE_MODE` determine the paste keys. On GNOME Wayland it reads the hotkeys through evdev and pastes through Mutter.
 
 ## Configuration
 
@@ -140,7 +154,7 @@ Supported output-format values in the current Linux script:
 | --- | --- | --- |
 | `VC_ENABLE_LLM` | `true` / `false` | Enable or disable Gemini post-processing |
 | `VC_LLM_FORMAT` | `plain` / `xml` / `json` | Shape of refined text |
-| `GEMINI_API_KEY` | API key | Required only when refinement is enabled |
+| `GEMINI_API_KEY` | API key | Required only when you enable refinement |
 | `VC_PASTE_MODE` | `auto` / `ctrl_v` / `ctrl_shift_v` | Paste-key behavior |
 
 Without `GEMINI_API_KEY`, the Linux implementation falls back to the local Whisper transcription.
@@ -149,8 +163,10 @@ Without `GEMINI_API_KEY`, the Linux implementation falls back to the local Whisp
 
 ### Implemented
 
-- Linux microphone recording and hotkey control.
-- CUDA-backed `whisper.cpp` transcription using `ggml-medium.en.bin`.
+- Linux microphone recording and hotkey control, on X11 and GNOME Wayland.
+- OpenRouter transcription (default) with `gpt-4o-mini-transcribe` or Parakeet TDT 0.6B v3.
+- CUDA-backed local `whisper.cpp` transcription using `ggml-medium.en.bin`, and local Parakeet.
+- The `whispertype` command: a menu, `status`, `stop`, `start --background`, and one shared engine at a time.
 - Clipboard insertion into the active application.
 - Terminal-aware paste-key selection on X11.
 - Optional Gemini text refinement with plain/XML/JSON output modes.
@@ -181,10 +197,10 @@ There are Windows-specific files in the repository, but this README does not pre
 
 These are implementation choices, not novelty claims:
 
-- **Local transcription:** microphone audio is processed through local `whisper.cpp`.
-- **Optional cloud refinement:** only the transcription text is sent to Gemini when enabled.
-- **Cursor-first workflow:** output is intended to land directly where the developer is already typing rather than in a separate transcription UI.
-- **Fail-closed GPU path:** the current Linux GPU script explicitly checks for NVIDIA availability rather than silently changing execution mode.
+- **Cloud or local transcription:** OpenRouter by default for speed; `whisper.cpp` or Parakeet on the local GPU when the audio must not leave the machine.
+- **Optional refinement:** WhisperType sends only the transcription text to Gemini when you enable refinement.
+- **Cursor-first workflow:** the design aims to place output where the developer is already typing. It aims to avoid a separate transcription UI.
+- **Fail-closed GPU path:** the local GPU engines explicitly check for NVIDIA availability rather than silently changing execution mode.
 
 ## Evals and test series
 
@@ -202,7 +218,7 @@ What it does **not** prove: microphone quality, transcription accuracy, Gemini a
 
 `Linux/test_llm_integration.py` targets an older Ollama/Qwen refinement path and should not be treated as verification of the current Gemini path.
 
-The smallest useful missing test is an automated smoke test around a fixed WAV fixture that verifies Whisper output and the current refinement adapter without requiring live microphone input.
+The smallest useful missing test is an automated smoke test with a fixed WAV fixture. It should check Whisper output and the current refinement adapter. It should require no live microphone input.
 
 ## Example
 

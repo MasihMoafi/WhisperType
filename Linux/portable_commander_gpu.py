@@ -8,6 +8,7 @@ from scipy.io.wavfile import write as write_wav
 import numpy as np
 import pyperclip
 from pynput import keyboard
+from desktop_input import listen_for_hotkeys, send_wayland_paste
 import sys
 from dotenv import load_dotenv
 
@@ -92,6 +93,9 @@ def send_paste(controller: keyboard.Controller = None):
         chosen = "ctrl_shift_v" if sys.platform.startswith("linux") and _is_terminal_focused_linux() else "ctrl_v"
     else:
         chosen = mode
+
+    if send_wayland_paste(chosen == "ctrl_shift_v"):
+        return
 
     # 1. Try kernel-level uinput injection via evdev (works on Wayland and X11)
     try:
@@ -315,7 +319,7 @@ class Recorder:
             if any(gpu_error_indicators):
                 os.remove(tmp_audio_path)
                 print("ERROR: GPU not available or Whisper fell back to CPU!")
-                print("Voice Commander requires GPU. Please check CUDA installation.")
+                print("WhisperType requires GPU. Please check CUDA installation.")
                 return
 
         os.remove(tmp_audio_path)
@@ -434,7 +438,7 @@ def main():
         print("=" * 60)
         print("ERROR: GPU NOT AVAILABLE")
         print("=" * 60)
-        print("Voice Commander requires CUDA-capable GPU.")
+        print("WhisperType requires CUDA-capable GPU.")
         print("Please ensure:")
         print("  1. NVIDIA GPU is installed")
         print("  2. CUDA drivers are installed (nvidia-smi works)")
@@ -443,7 +447,7 @@ def main():
         print("=" * 60)
         sys.exit(1)
 
-    print(f"VoiceCommander (GPU) is active.")
+    print(f"WhisperType (GPU) is active.")
     print("  Right Ctrl / F8 / F9: Start/Stop recording → LLM refinement → paste")
     print("GPU acceleration enabled with CUDA.")
     print("⚠️  GPU-ONLY MODE: Will fail if GPU unavailable (no CPU fallback)")
@@ -454,8 +458,7 @@ def main():
     print("The transcribed text will be pasted at your cursor's location.")
     print("Close this window or press Ctrl+C to exit.")
 
-    with keyboard.Listener(on_press=on_press) as listener:
-        listener.join()
+    listen_for_hotkeys(on_press)
 
 
 if __name__ == "__main__":

@@ -14,7 +14,7 @@ audio = (np.sin(2 * np.pi * 300 * t) * 8000).astype(np.int16)
 wav_path = os.path.join(tempfile.gettempdir(), f"bench_{uuid.uuid4()}.wav")
 write_wav(wav_path, sr, audio)
 
-print(f"=== Voice Commander GPU Benchmark ({duration}s audio fixture) ===")
+print(f"=== WhisperType GPU Benchmark ({duration}s audio fixture) ===")
 
 # 1. Whisper Medium (CUDA)
 whisper_exe = os.path.join(BASE_DIR, "whisper.cpp", "build", "bin", "whisper-cli")

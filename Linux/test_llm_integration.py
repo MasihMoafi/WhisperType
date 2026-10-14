@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script for LLM integration with Voice Commander
+Test script for LLM integration with WhisperType
 Tests Ollama connectivity and text refinement
 """
 
@@ -108,7 +108,7 @@ Corrected:"""
 
 def main():
     print("=" * 60)
-    print("Voice Commander LLM Integration Test")
+    print("WhisperType LLM Integration Test")
     print("=" * 60)
     
     print("\n1. Testing Ollama connection...")
@@ -135,7 +135,7 @@ def main():
     print("\n" + "=" * 60)
     print("✓ ALL TESTS PASSED")
     print("=" * 60)
-    print("\nYour Voice Commander is ready to use with LLM post-processing!")
+    print("\nYour WhisperType is ready to use with LLM post-processing!")
     print("Run with: python Linux/portable_commander_gpu.py")
 
 if __name__ == "__main__":

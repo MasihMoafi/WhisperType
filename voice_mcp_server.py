@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""MCP Server for WhisperType (Whisper.cpp audio transcription and status)."""
+"""MCP Server for WhisperType: OpenRouter or local Whisper.cpp transcription, plus dictation control."""
 
 import os
 import sys
@@ -36,6 +36,19 @@ mcp = FastMCP("WhisperType")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 WHISPER_CPP_DIR = os.path.join(BASE_DIR, "whisper.cpp")
 WHISPER_MODELS_DIR = os.path.join(WHISPER_CPP_DIR, "models")
+WHISPERTYPE_CLI = os.path.join(BASE_DIR, "whispertype")
+BACKEND = os.environ.get("WHISPERTYPE_BACKEND", "openrouter").strip().lower()
+ENGINES = ("cloud", "local", "parakeet")
+
+sys.path.insert(0, os.path.join(BASE_DIR, "Linux"))
+import cloud_transcribe as cloud  # noqa: E402  (shared with the dictation engine)
+
+
+def whispertype(*args: str, env: Optional[Dict[str, str]] = None) -> str:
+    """Run the WhisperType CLI, the single owner of dictation state."""
+    result = subprocess.run([WHISPERTYPE_CLI, *args], capture_output=True, text=True,
+                            env={**os.environ, **(env or {})}, timeout=30)
+    return result.stdout.strip() or json.dumps({"error": result.stderr.strip()})
 
 
 def get_whisper_executable() -> Optional[str]:
@@ -215,6 +228,12 @@ def voice_status() -> str:
         },
         "audio_input": mic,
         "gpu": gpu,
+        "backend": {
+            "default": BACKEND,
+            "model": cloud.MODEL,
+            "company_key_configured": bool(os.environ.get("OPENROUTER_API_KEY_COMPANY")),
+        },
+        "dictation": json.loads(whispertype("status", "--json")),
         "llm_refinement": {
             "gemini_api_key_configured": gemini_key,
             "format": os.environ.get("VC_LLM_FORMAT", "xml")
@@ -231,8 +250,10 @@ def transcribe_audio(
     refine_prompt: bool = False,
     model_path: str = "",
     threads: int = 4,
+    backend: str = "",
+    cloud_model: str = "",
 ) -> str:
-    """Transcribes audio file or base64-encoded audio buffer using local Whisper.cpp.
+    """Transcribes an audio file or base64-encoded audio with OpenRouter (default) or local Whisper.cpp.
 
     Args:
         audio_path: Path to local audio file (.wav, .mp3, etc.)
@@ -241,6 +262,8 @@ def transcribe_audio(
         refine_prompt: Whether to run Gemini LLM refinement on the transcribed text
         model_path: Optional path to specific ggml model file
         threads: Number of CPU threads to use (default: 4)
+        backend: "openrouter" or "local"; empty uses WHISPERTYPE_BACKEND (default openrouter)
+        cloud_model: OpenRouter model ID; empty uses WHISPERTYPE_CLOUD_MODEL
 
     Returns:
         JSON string containing transcription results, raw text, and metadata.
@@ -251,15 +274,16 @@ def transcribe_audio(
             "error": "Either audio_path or audio_base64 must be provided."
         }, indent=2)
 
+    chosen_backend = (backend or BACKEND).strip().lower()
     executable = get_whisper_executable()
-    if not executable:
+    if chosen_backend == "local" and not executable:
         return json.dumps({
             "success": False,
             "error": f"Whisper executable not found in {WHISPER_CPP_DIR}/build/bin/whisper-cli"
         }, indent=2)
 
     chosen_model = model_path if model_path and os.path.isfile(model_path) else get_default_model_path()
-    if not chosen_model or not os.path.isfile(chosen_model):
+    if chosen_backend == "local" and (not chosen_model or not os.path.isfile(chosen_model)):
         return json.dumps({
             "success": False,
             "error": f"Whisper model file not found in {WHISPER_MODELS_DIR}"
@@ -289,6 +313,13 @@ def transcribe_audio(
                 "success": False,
                 "error": f"Audio file not found: {target_audio}"
             }, indent=2)
+
+        if chosen_backend != "local":
+            model = cloud_model or cloud.MODEL
+            raw_text = cloud.transcribe(target_audio, model=model)
+            final_text = refine_transcription_llm(raw_text, os.environ.get("VC_LLM_FORMAT", "xml")) if refine_prompt and raw_text else raw_text
+            return json.dumps({"success": True, "text": final_text, "raw_transcription": raw_text, "language": language,
+                               "model": model, "backend": "openrouter", "refined": refine_prompt}, indent=2)
 
         cmd = [
             executable,
@@ -322,6 +353,7 @@ def transcribe_audio(
             "raw_transcription": raw_text,
             "language": language,
             "model": os.path.basename(chosen_model),
+            "backend": "local",
             "refined": refine_prompt
         }, indent=2)
 
@@ -337,6 +369,31 @@ def transcribe_audio(
                 os.remove(temp_file_to_clean)
             except OSError:
                 pass
+
+
+@mcp.tool()
+def dictation_status() -> str:
+    """Reports whether hotkey dictation (Right Ctrl/F8/F9 → text at the cursor) is running, and its engine and model."""
+    return whispertype("status", "--json")
+
+
+@mcp.tool()
+def start_dictation(engine: str = "cloud", model: str = "") -> str:
+    """Starts hotkey dictation in the background. Only one engine runs at a time.
+
+    Args:
+        engine: "cloud" (OpenRouter), "local" (GPU Whisper) or "parakeet" (GPU Parakeet)
+        model: OpenRouter model ID for the cloud engine, e.g. nvidia/parakeet-tdt-0.6b-v3
+    """
+    if engine not in ENGINES:
+        return json.dumps({"success": False, "error": f"engine must be one of {', '.join(ENGINES)}"})
+    return whispertype(engine, "--background", env={"WHISPERTYPE_CLOUD_MODEL": model} if model else None)
+
+
+@mcp.tool()
+def stop_dictation() -> str:
+    """Stops hotkey dictation."""
+    return whispertype("stop")
 
 
 def main():

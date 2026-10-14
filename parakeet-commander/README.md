@@ -29,7 +29,7 @@ Measured sequentially on real 30-second audio dictation on NVIDIA RTX 3070 Lapto
 ## One-Time Setup
 
 ```bash
-# From the Voice-Commander repo root:
+# From the WhisperType repo root:
 bash parakeet-commander/setup.sh
 ```
 

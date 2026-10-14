@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Voice Commander — parakeet.cpp backend (CUDA-only, no LLM).
+"""WhisperType — parakeet.cpp backend (CUDA-only, no LLM).
 
 Hotkeys: F8 / F9 / Right Ctrl — toggle recording.
 Transcribed text is pasted directly at the cursor, no refinement step.
@@ -25,6 +25,8 @@ from scipy.io.wavfile import write as write_wav
 SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT    = os.path.dirname(SCRIPT_DIR)
 PARAKEET_DIR = os.path.join(REPO_ROOT, "parakeet.cpp")
+sys.path.insert(0, os.path.join(REPO_ROOT, "Linux"))
+from desktop_input import listen_for_hotkeys, send_wayland_paste, write_engine_state
 
 _CLI_A = os.path.join(PARAKEET_DIR, "build", "bin", "parakeet-cli")
 _CLI_B = os.path.join(PARAKEET_DIR, "build", "examples", "cli", "parakeet-cli")
@@ -132,6 +134,9 @@ def send_paste(ctrl: keyboard.Controller = None):
         mode == "ctrl_shift_v"
         or (mode == "auto" and sys.platform.startswith("linux") and _terminal_focused())
     )
+
+    if send_wayland_paste(use_shift):
+        return
 
     # 1. Try kernel-level uinput injection via evdev (works on Wayland and X11)
     try:
@@ -344,8 +349,9 @@ def main():
     if not verify_setup():
         sys.exit(1)
 
+    write_engine_state("local", "parakeet tdt-0.6b-v2")
     print("=" * 55)
-    print("VoiceCommander — parakeet.cpp / CUDA")
+    print("WhisperType — parakeet.cpp / CUDA")
     print(f"  binary : {PARAKEET_EXECUTABLE}")
     print(f"  model  : tdt-0.6b-v2-f16.gguf")
     print(f"  device : CUDA0")
@@ -354,8 +360,7 @@ def main():
     print("  Ctrl+C to exit")
     print("=" * 55)
 
-    with keyboard.Listener(on_press=on_press) as listener:
-        listener.join()
+    listen_for_hotkeys(on_press)
 
 
 if __name__ == "__main__":
