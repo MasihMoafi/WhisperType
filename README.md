@@ -236,3 +236,19 @@ The next useful distribution step is a prebuilt package with clean-machine CI ve
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+<!-- more-projects:start -->
+## More projects
+
+- [Elpis](https://github.com/MasihMoafi/Elpis): a coding agent for the terminal and desktop, with explicit context control
+- [Rustidian](https://github.com/MasihMoafi/rustidian): a native Markdown notebook for Linux that opens Obsidian-format vaults
+- [rag-mcp](https://github.com/MasihMoafi/rag-mcp): local hybrid search over your documents, as a CLI and MCP server
+- [Skills](https://github.com/MasihMoafi/skills): SKILL.md workflows for coding agents
+- [Read Aloud](https://github.com/MasihMoafi/read-aloud): select text, press Super+R, hear it in a local voice
+- [Love Spot](https://github.com/MasihMoafi/love-spot): a shared drawing board where characters talk, draw and compete with you
+- [SVG Studio](https://svg.masihmoafi.com): high-quality image vectorization
+- [Pin](https://github.com/MasihMoafi/pin): an always-on-top priority note, saved as plain Markdown
+- [Clocki](https://github.com/MasihMoafi/clocki): a floating desktop timer for tracking focus hours
+
+All of them: [masihmoafi.com](https://masihmoafi.com/projects)
+<!-- more-projects:end -->
